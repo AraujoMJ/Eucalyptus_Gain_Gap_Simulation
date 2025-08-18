@@ -72,19 +72,21 @@ Eucalyptus_Gain_Gap_Simulation/
    git clone https://github.com/USERNAME/Eucalyptus_Gain_Gap_Simulation.git
    cd Eucalyptus_Gain_Gap_Simulation
    ```
-2. Open and edit simulation parameters in `Selfing_Eucalyptus_2025.R` (e.g., selfing rates, number of replicates, selection intensities).
+2. Open and edit simulation parameters in `Selfing_Eucalyptus_2025.Rmd` (e.g., selfing rates, number of replicates, selection intensities).
 
 3. Run the main pipeline in R:
 
 ```{r}
-source("R/Tree_breeding_simulator.R")
-source("R/Selfing_Eucalyptus_2025.R")
+# Load functions
+source("/Tree_breeding_simulator.R")
+source("/GenGainFunc.R")
 
 ```
+Run the script:
 
-results <- Tree_breeding_simulator(params)
+`Selfing_Eucalyptus_2025.Rmd`
 
-4. Generated output tables and figures will be stored in `data/output/` and `figs/`.
+4. Run the script `Results_2025_Final.Rmd` and generated output.
 
 ## Citation
 If you use this repository, please cite:
