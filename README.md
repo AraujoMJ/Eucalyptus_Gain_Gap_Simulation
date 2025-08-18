@@ -76,7 +76,7 @@ Eucalyptus_Gain_Gap_Simulation/
 
 3. Run the main pipeline in R:
 
-```
+```{r}
 source("R/Tree_breeding_simulator.R")
 source("R/Selfing_Eucalyptus_2025.R")
 
