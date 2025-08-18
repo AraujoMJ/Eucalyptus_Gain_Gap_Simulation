@@ -1,0 +1,2849 @@
+---
+title: "Results from simulations"
+author: "Marcio Araujo"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: hide
+    toc: yes
+    toc_depth: '2'
+    df_print: paged
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+    number_sections: yes
+    fig_caption: yes
+    toc-location: left
+  html_notebook:
+    code_folding: hide
+    toc: yes
+    toc_depth: '2'
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+    number_sections: yes
+    fig_caption: yes
+    toc-location: left
+---
+[Araujo, MJ](http://lattes.cnpq.br/0015960014138408)  
+
+```{r fistChunck, include=F}
+knitr::opts_chunk$set(
+  echo = T,
+  warning = F,
+  message = F
+  # fig.height = 5.5,
+  # fig.width = 8.5
+  
+)
+```
+
+```{r Useful.setup, eval=F}
+# Check number of cores in my computer
+num_cores <- parallel::detectCores()
+cat("Number of cores in your machine:", num_cores, "\n")
+
+```
+
+# Loading the following packages
+
+```{r load.pct, warning=FALSE,message=F}
+# R 4.4.3
+library(tidyverse)
+library(ggridges)
+library(qs)
+```
+
+# Read data
+
+```{r read_op_data}
+# OP.S1_S10 = Simulations from 1 to 10
+OP.S1_S10 <- qread("OP.S1_S10.qs")
+# OP.S11_S20 = Simulations from 11 to 20
+OP.S11_S20 <- qread("OP.S11_S20.qs")
+# OP.S21_S30 = Simulations from 21 to 30
+OP.S21_S30 <- qread("OP.S21_S30.qs")
+# OP.S31_S40 = Simulations from 31 to 40
+OP.S31_S40 <- qread("OP.S31_S40.qs")
+# OP.S41_S50 = Simulations from 41 to 50
+OP.S41_S50 <- qread("OP.S41_S50.qs")
+# OP.S51_S60 = Simulations from 51 to 60
+OP.S51_S60 <- qread("OP.S51_S60.qs")
+# OP.S61_S70 = Simulations from 61 to 70
+OP.S61_S70 <- qread("OP.S61_S70.qs")
+# OP.S71_S80 = Simulations from 71 to 80
+OP.S71_S80 <- qread("OP.S71_S80.qs")
+# OP.S81_S90 = Simulations from 81 to 90
+OP.S81_S90 <- qread("OP.S81_S90.qs")
+# OP.S91_S100 = Simulations from 91 to 100
+OP.S91_S100 <- qread("OP.S91_S100.qs")
+
+
+# Merge lists
+OP.SIMUL <- c(
+  OP.S1_S10,
+  OP.S11_S20, 
+  OP.S21_S30,
+  OP.S31_S40,
+  OP.S41_S50,
+  OP.S51_S60,
+  OP.S61_S70,
+  OP.S71_S80,
+  OP.S81_S90,
+  OP.S91_S100
+  )
+
+
+# Clean the list
+OP.SIMUL <- rlist::list.exclude(OP.SIMUL, class(.) == "try-error")
+```
+
+```{r remove_ind_op_data}
+rm(
+  OP.S1_S10,
+  OP.S11_S20,
+  OP.S21_S30,
+  OP.S31_S40, 
+  OP.S41_S50,
+  OP.S51_S60,
+  OP.S61_S70,
+  OP.S71_S80,
+  OP.S81_S90,
+  OP.S91_S100
+)
+gc()
+```
+
+# Distribution of heritabilities
+
+```{r op_prep.data.dist}
+# OP.SIMUL <- OP.S1_S10_renamed
+H2 <- list()
+for (i in names(OP.SIMUL)) {
+    # h2 from simulations
+    h2 <- OP.SIMUL[[i]][["Herit.All"]] |>
+      mutate(Simul = trimws(gsub(".*Rep", "", i)),
+             SelfRate = unique(OP.SIMUL[[i]][["SelfRate"]])
+             )
+    H2[[i]] <- h2
+
+}
+
+# Get data.frame
+H2.DT <- lapply(H2, function(x)
+  bind_rows(x)) |>
+  bind_rows()
+
+# Get h2a
+H2a.OP <- H2.DT |>
+  rename(Model = TypePop) |> 
+  filter(h2.type == "h2a" & Model %in% c("Fam", "GBlup", "GDBlup", "ssGDBlup", "True")) |>
+  mutate(Model = case_when(
+    Model == "Fam" ~ "Half-Sib",
+    Model == "GBlup" ~ "GBlup",
+    Model == "GDBlup" ~ "GDBlup",
+    Model == "ssGDBlup" ~ "ssGDBlup",
+    Model == "True" ~ "True h2a",
+    TRUE ~ NA_character_
+  )) |> 
+  # convert self rate (%0.0 format) to numeric
+  mutate(SelfRate = round(as.numeric(gsub("%", "", SelfRate)) / 100, 2))
+# Get h2d
+H2d.OP <- H2.DT |>
+  rename(Model = TypePop) |> 
+  filter(h2.type == "h2d" & Model %in% c("Fam", "GBlup", "GDBlup", "ssGDBlup", "True")) |>
+  mutate(Model = case_when(
+    Model == "Fam" ~ "Half-Sib",
+    Model == "GBlup" ~ "GBlup",
+    Model == "GDBlup" ~ "GDBlup",
+    Model == "ssGDBlup" ~ "ssGDBlup",
+    Model == "True" ~ "True h2d",
+    TRUE ~ NA_character_
+  )) |> 
+  # convert self rate (%0.0 format) to numeric
+  mutate(SelfRate = round(as.numeric(gsub("%", "", SelfRate)) / 100, 2))
+
+# Get True values
+  ## h2a
+Real_h2a_op <- H2a.OP |> 
+  filter(
+    Model == "True h2a"
+  ) |> 
+  dplyr::select(
+    Model,
+    Simul,
+    SelfRate,
+    Estimate
+  ) |> 
+  rename(True_value = Estimate,
+         True_value_model = Model)
+  ## h2d
+Real_h2d_op <- H2d.OP |> 
+  filter(
+    Model == "True h2d"
+  ) |> 
+  dplyr::select(
+    Model,
+    Simul,
+    SelfRate,
+    Estimate
+  ) |> 
+  rename(True_value = Estimate,
+         True_value_model = Model)
+  ## Merge data and calculate bias h2a
+H2a.OP.Bias <- H2a.OP |> 
+  left_join(
+    Real_h2a_op,
+    by = c(
+      "SelfRate",
+      "Simul"
+    )
+  ) |> 
+  mutate(
+    Bias = Estimate - True_value
+  ) |> 
+  dplyr::select(
+    !True_value_model
+  )
+## Merge data and calculate bias h2d
+H2d.OP.Bias <- H2d.OP |> 
+  left_join(
+    Real_h2d_op,
+    by = c(
+      "SelfRate",
+      "Simul"
+    )
+  ) |> 
+  mutate(
+    Bias = Estimate - True_value
+  ) |> 
+  dplyr::select(
+    !True_value_model
+  )
+
+# Get Median value for bias calculation
+  ## h2a
+H2a.OP.mean <- H2a.OP.Bias |>
+  group_by(Model, SelfRate) |>
+  summarise(
+    SD = round(sd(Bias, na.rm = T), 2),
+    Estimate = round(median(Estimate, na.rm = T), 2),
+    Bias = round(median(Bias, na.rm = T), 3))
+  ## h2d
+H2d.OP.mean <- H2d.OP.Bias |>
+  group_by(Model, SelfRate) |>
+  summarise(
+    SD = round(sd(Bias, na.rm = T), 2),
+    Estimate = round(median(Estimate, na.rm = T), 2),
+    Bias = round(median(Bias, na.rm = T), 3))
+# Calculate the bias for h2a
+  ## standard deviation
+SD.Bias.h2a.OP <- H2a.OP.mean |>
+  dplyr::select(!c(Estimate, SD)) |> 
+  pivot_wider(names_from = Model, values_from = Bias) |>
+  mutate(
+    `True h2a` = scales::percent(`True h2a`, accuracy = 1),
+    GBlup = scales::percent(GBlup, accuracy = 1),
+    GDBlup = scales::percent(GDBlup, accuracy = 1),
+    `Half-Sib` = scales::percent(`Half-Sib`, accuracy = 1)) |>
+  mutate(Model = "Half-Sib")
+
+SD.Bias.h2d.OP <- H2d.OP.mean |>
+  dplyr::select(!c(Estimate, SD)) |> 
+  pivot_wider(names_from = Model, values_from = Bias) |>
+  mutate(
+    `True h2d` = scales::percent(`True h2d`, accuracy = 1),
+    GDBlup = scales::percent(GDBlup, accuracy = 1)) |>
+  mutate(Model = "GDBlup")
+
+Bias.h2a.OP <- H2a.OP.mean |>
+  mutate(
+    Bias_percent = paste(
+      scales::percent(Bias, accuracy = 1)
+    )
+  )
+# Calculate the bias for h2d
+Bias.h2d.OP <- H2d.OP.mean |>
+  mutate(
+    Bias_percent = paste(
+      scales::percent(Bias, accuracy = 1)
+    )
+  )
+
+```
+
+
+## Plotting the distribution of h2a and h2d
+
+### OP h2a
+
+```{r new_approach_op, fig.height=8, fig.width=10}
+#getOption("bitmapType")
+options(bitmapType = "cairo")
+
+# Duplicate "True h2a" across all Models for comparison
+H2a.OP.withTrue <- H2a.OP |>
+  filter(Model == "True h2a") |>
+  mutate(ModelFacet = list(unique(H2a.OP$Model))) |>
+  tidyr::unnest(ModelFacet) |>
+  rename(ModelComparison = Model) |>
+  bind_rows(H2a.OP |> mutate(ModelFacet = Model)) |>
+  filter(ModelFacet != "True h2a") |>
+  mutate(
+    ModelFacet = case_when(
+      ModelFacet == "GBlup" ~ "GBLUP model",
+      ModelFacet == "GDBlup" ~ "GDBLUP model",
+      ModelFacet == "ssGDBlup" ~ "ssGDBLUP model",
+      ModelFacet == "Half-Sib" ~ "Half-Sib/Family model",
+      TRUE ~ NA_character_
+    )
+  )
+
+# Update medians calculation to match the new structure
+H2a.OP.mean.withTrue <- H2a.OP.withTrue |>
+  # Include real values
+  left_join(
+    Real_h2a_op |> 
+      dplyr::select(!True_value_model),
+    by = c(
+      "Simul",
+      "SelfRate"
+    )
+  ) |> 
+  mutate(
+    Bias = True_value - Estimate
+  ) |> 
+  group_by(SelfRate, ModelFacet, ModelComparison) |>
+  summarise(
+    SD = round(sd(Bias, na.rm = T), 2),
+    Estimate = round(median(Estimate, na.rm = T), 2),
+    Bias = round(median(Bias, na.rm = T), 3),
+    .groups = "drop"
+  ) |>
+  filter(ModelFacet != "True h2a") |>
+  mutate(ModelComparison = ifelse(is.na(ModelComparison), ModelFacet, ModelComparison)) |>
+  mutate(ModelFacet = factor(
+    ModelFacet,
+    levels = c(
+      "GDBLUP model",
+      "GBLUP model",
+      "ssGDBLUP model",
+      "Half-Sib/Family model"
+    )
+  )) |> 
+  mutate(
+    SelfRateReversed = factor(SelfRate, levels = rev(levels(factor(SelfRate)))),
+    y.pos_start = as.numeric(SelfRateReversed) - 0.2,  # Adjust start of median line
+    y.pos_end = as.numeric(SelfRateReversed) + 0.2    # Adjust end of median line
+  )
+
+Bias.OP <- Bias.h2a.OP |>
+  mutate(
+    # Model comparison column
+    ModelComparison = case_when(
+      Model == "GDBlup" ~ "GDBLUP model",
+      Model == "GBlup" ~ "GBLUP model",
+      Model == "ssGDBlup" ~ "ssGDBLUP model",
+      Model == "Half-Sib" ~ "Half-Sib/Family model",
+      TRUE ~ NA_character_
+    )
+  ) |> 
+  mutate(ModelFacet = factor(
+      ModelComparison,
+      levels = c(
+        "GDBLUP model",
+        "GBLUP model",
+        "ssGDBLUP model",
+        "Half-Sib/Family model"
+      )
+    ),
+    Estimate = gsub("Median bias = ", "", Estimate)
+  ) |> 
+  mutate(
+    bias_label = paste(Bias_percent, "±", scales::percent(SD, accuracy = 2)),
+    SelfRateReversed = factor(SelfRate, levels = rev(levels(factor(SelfRate)))),
+    y.pos = as.numeric(SelfRateReversed)  # Use numeric values for positioning
+  )
+
+ggplot(
+  H2a.OP.withTrue |>
+    mutate(ModelComparison = ifelse(
+      is.na(ModelComparison), ModelFacet, ModelComparison
+    )) |>
+    mutate(ModelFacet = factor(
+      ModelFacet,
+      levels = c(
+        "GDBLUP model",
+        "GBLUP model",
+        "ssGDBLUP model",
+        "Half-Sib/Family model"
+      )
+    )),
+  aes(
+    x = Estimate,
+    y = factor(SelfRate),
+    fill = ModelComparison  # Fill curves by ModelComparison
+  )
+) +
+  geom_density_ridges(alpha = 0.6) +
+  geom_segment(
+    data = H2a.OP.mean.withTrue,
+    aes(
+      x = Estimate,
+      xend = Estimate,
+      y = y.pos_start,
+      yend = y.pos_end,
+      color = ModelComparison  # Median line color matches the model
+    ),
+    lineend = "round",
+    linejoin = "bevel",
+    inherit.aes = FALSE,
+    linetype = "solid",
+    linewidth = 1
+  ) +
+  scale_fill_manual(
+    name = "",
+    breaks = c(
+      "True h2a",
+      "GDBLUP model",
+      "GBLUP model",
+      "ssGDBLUP model",
+      "Half-Sib/Family model"
+    ),
+    labels = c(
+      "True h2a",
+      "GDBLUP model",
+      "GBLUP model",
+      "ssGDBLUP model",
+      "Half-Sib/Family model"
+    ),
+    values = c("grey40", "blue", "red", "magenta4", "darkgreen")
+  ) +
+  scale_colour_manual(
+    name = "",
+    breaks = c(
+      "True h2a",
+      "GDBLUP model",
+      "GBLUP model",
+      "ssGDBLUP model",
+      "Half-Sib/Family model"
+    ),
+    labels = c(
+      "True h2a",
+      "GDBLUP model",
+      "GBLUP model",
+      "ssGDBLUP model",
+      "Half-Sib/Family model"
+    ),
+    values = c("grey40", "blue", "red", "magenta4", "darkgreen")
+  ) +
+  #scale_fill_viridis_d()
+  labs(x = expression(paste("Narrow sense heritabilities (", h[a] ^ 2, ")")),
+       y = "Selfing Rate",
+       title = "") +
+  geom_text(
+    data = Bias.OP |> 
+      filter(
+        !is.na(ModelFacet)
+      ),
+    aes(label = bias_label, y = y.pos + 0.5  , color = ModelFacet),
+    x = 0.7,
+    alpha = 0.8,
+    size = 4.5,
+    show.legend = F
+  ) +
+  annotate(
+    geom = "text",
+    x = 0.7,
+    y = 8.1,
+    label = "Median Bias:",
+    size = 4.5
+  ) +
+  scale_y_discrete(
+  limits = rev(levels(factor(H2a.OP.withTrue$SelfRate))),
+  labels = function(x) scales::percent(as.numeric(x), accuracy = 1)
+  ) +
+  facet_wrap( ~ ModelFacet, scales = "free_y", ncol = 2) +
+  theme_bw(base_size = 15)
+
+ggsave("Results/H2.OP_plot_2025.png",
+       dpi = 300,
+       height = 9,
+       width = 10.5
+       )
+
+```
+
+
+### OP h2d
+
+```{r op.plot.dist.h2d, fig.height=7, fig.width=11}
+# Duplicate "True h2a" across all Models for comparison
+H2d.OP.withTrue <- H2d.OP |>
+  filter(Model == "True h2d") |>
+  mutate(ModelFacet = list(unique(H2d.OP$Model))) |>
+  tidyr::unnest(ModelFacet) |>
+  rename(ModelComparison = Model) |>
+  bind_rows(H2d.OP |> mutate(ModelFacet = Model)) |>
+  filter(ModelFacet != "True h2d") |>
+  mutate(
+    ModelFacet = case_when(
+      ModelFacet == "GDBlup" ~ "GDBLUP model",
+      ModelFacet == "ssGDBlup" ~ "ssGDBLUP model",
+      TRUE ~ NA_character_
+    )
+  )
+
+# Update medians calculation to match the new structure
+H2d.OP.mean.withTrue <- H2d.OP.withTrue |>
+  # Include real values
+  left_join(
+    Real_h2d_op |> 
+      dplyr::select(!True_value_model),
+    by = c(
+      "Simul",
+      "SelfRate"
+    )
+  ) |> 
+  mutate(
+    Bias = True_value - Estimate
+  ) |> 
+  group_by(SelfRate, ModelFacet, ModelComparison) |>
+  summarise(
+    SD = round(sd(Bias, na.rm = T), 2),
+    Estimate = round(median(Estimate, na.rm = T), 2),
+    Bias = round(median(Bias, na.rm = T), 3),
+    .groups = "drop"
+  ) |> 
+  filter(ModelFacet != "True h2d") |>
+  mutate(ModelComparison = ifelse(is.na(ModelComparison), ModelFacet, ModelComparison)) |>
+  mutate(ModelFacet = factor(
+    ModelFacet,
+    levels = c(
+      "GDBLUP model",
+      "ssGDBLUP model"
+    )
+  )) |> 
+  mutate(
+    SelfRateReversed = factor(SelfRate, levels = rev(levels(factor(SelfRate)))),
+    y.pos_start = as.numeric(SelfRateReversed) - 0.2,  # Adjust start of median line
+    y.pos_end = as.numeric(SelfRateReversed) + 0.2    # Adjust end of median line
+  )
+
+Bias.OP.dom <- Bias.h2d.OP |>
+  mutate(
+    # Model comparison column
+    ModelComparison = case_when(
+      Model == "GDBlup" ~ "GDBLUP model",
+      Model == "ssGDBlup" ~ "ssGDBLUP model",
+      TRUE ~ NA_character_
+    )
+  ) |> 
+  mutate(ModelFacet = factor(
+      ModelComparison,
+      levels = c(
+        "GDBLUP model",
+        "ssGDBLUP model"
+      )
+    ),
+    Estimate = gsub("Median bias = ", "", Estimate)
+  ) |> 
+  mutate(
+    bias_label = paste(Bias_percent, "±", scales::percent(SD, accuracy = 2)),
+    SelfRateReversed = factor(SelfRate, levels = rev(levels(factor(SelfRate)))),
+    y.pos = as.numeric(SelfRateReversed)  # Use numeric values for positioning
+  )
+
+# Plot dominance effect
+ggplot(
+  H2d.OP.withTrue |>
+    mutate(ModelComparison = ifelse(
+      is.na(ModelComparison), ModelFacet, ModelComparison
+    )) |>
+    mutate(ModelFacet = factor(
+      ModelFacet,
+      levels = c(
+        "GDBLUP model",
+        "ssGDBLUP model"
+      )
+    )),
+  aes(
+    x = Estimate,
+    y = factor(SelfRate),
+    fill = ModelComparison  # Fill curves by ModelComparison
+  )
+) +
+  geom_density_ridges(alpha = 0.6) +
+  geom_segment(
+    data = H2d.OP.mean.withTrue,
+    aes(
+      x = Estimate,
+      xend = Estimate,
+      y = y.pos_start,
+      yend = y.pos_end,
+      color = ModelComparison  # Median line color matches the model
+    ),
+    inherit.aes = FALSE,
+    linetype = "solid",
+    linewidth = 1
+  ) +
+  scale_fill_manual(
+    name = "",
+    breaks = c(
+      "True h2d",
+      "GDBLUP model",
+      "ssGDBLUP model"
+    ),
+    labels = c(
+      "True h2d",
+      "GDBLUP model",
+      "ssGDBLUP model"
+    ),
+    values = c("grey40", "blue", "magenta4")
+  ) +
+  scale_colour_manual(
+    name = "",
+    breaks = c(
+      "True h2d",
+      "GDBLUP model",
+      "ssGDBLUP model"
+    ),
+    labels = c(
+      "True h2d",
+      "GDBLUP model",
+      "ssGDBLUP model"
+    ),
+    values = c("grey40", "blue", "magenta4")
+  ) +
+  #scale_fill_viridis_d()
+  labs(x = expression(paste("Coefficient of dominance effect (",h[d]^2 ,")")),
+       y = "Selfing Rate",
+       title = "") +
+  geom_text(
+    data = Bias.OP.dom |> 
+      filter(!is.na(ModelFacet)),
+    aes(label = bias_label, y = y.pos + 0.5  , color = ModelFacet),
+    x = 0.65,
+    alpha = 0.8,
+    size = 4,
+    show.legend = F
+  ) +
+  annotate(
+    geom = "text",
+    x = 0.65,
+    y = 8.1,
+    label = "Median Bias:",
+    size = 4
+  ) +
+  scale_y_discrete(
+  limits = rev(levels(factor(H2d.OP.withTrue$SelfRate))),
+  labels = function(x) scales::percent(as.numeric(x), accuracy = 1)
+  ) +
+  xlim(0, 0.8) +
+  facet_wrap( ~ ModelFacet, scales = "free_y", ncol = 3) +
+  theme_bw(base_size = 14) +
+  theme(
+    legend.position = "bottom",
+    legend.direction = "horizontal"
+  )
+
+ggsave("Results//Dom.OP.plot_2025.png",
+       dpi = 300,
+       height = 6.5,
+       width = 10.5
+       )
+```
+
+# Breeding values and correlations (accuracy - $r_{aa}$)
+
+```{r PrepBV.and.correlations}
+# Prepare data
+  ## OP
+BV.OP.list <- list()
+for (i in names(OP.SIMUL)) {
+  # h2 from simulations
+    BV.OP.list[[i]] <- OP.SIMUL[[i]][["BV_ALL"]] |>
+      mutate(Simul = trimws(gsub(".*Rep", "", i)),
+             SelfRate = unique(OP.SIMUL[[i]][["SelfRate"]])
+             )
+}
+
+BV.ssGBlup.OP.list <- list()
+for (i in names(OP.SIMUL)) {
+  # h2 from simulations
+    BV.ssGBlup.OP.list[[i]] <- OP.SIMUL[[i]][["BV_ALL.ssGBLUP"]] |>
+      mutate(Simul = trimws(gsub(".*Rep", "", i)),
+             SelfRate = unique(OP.SIMUL[[i]][["SelfRate"]]),
+             nGeno = OP.SIMUL[[i]][["BV_ALL.ssGBLUP"]][["% genotyped"]]
+             )
+}
+
+# Get data.frame
+  ## OP
+BV.OP <- BV.OP.list |>
+  bind_rows() |> 
+  # Fix selfing rates of 76.0% to 75.0%; 6.0% to 5.0%; 51.0% to 50.0%; 26.0% to 25.0%; 11.0% to 10.0% and 1.0% to 0.0%. Some values fall in a values around the fixed selfing rate, that's why we are rounding them
+  mutate(SelfRate = case_when(
+    SelfRate == "76.0%" ~ "75.0%",
+    SelfRate == "6.0%" ~ "5.0%",
+    SelfRate == "51.0%" ~ "50.0%",
+    SelfRate == "26.0%" ~ "25.0%",
+    SelfRate == "11.0%" ~ "10.0%",
+    SelfRate == "1.0%" ~ "0.0%",
+    TRUE ~ SelfRate
+  )) |>
+  # convert self rate (%0.0 format) to numeric
+  mutate(SelfRate = round(as.numeric(gsub("%", "", SelfRate)) / 100, 2))
+
+BV.ssGBlup.OP <-  BV.ssGBlup.OP.list |>
+  bind_rows() |> 
+  # Fix selfing rates of 76.0% to 75.0%; 6.0% to 5.0%; 51.0% to 50.0%; 26.0% to 25.0%; 11.0% to 10.0% and 1.0% to 0.0%
+  mutate(SelfRate = case_when(
+    SelfRate == "76.0%" ~ "75.0%",
+    SelfRate == "6.0%" ~ "5.0%",
+    SelfRate == "51.0%" ~ "50.0%",
+    SelfRate == "26.0%" ~ "25.0%",
+    SelfRate == "11.0%" ~ "10.0%",
+    SelfRate == "1.0%" ~ "0.0%",
+    TRUE ~ SelfRate
+  )) |>
+  # convert self rate (%0.0 format) to numeric
+  mutate(SelfRate = round(as.numeric(gsub("%", "", SelfRate)) / 100, 2)) |> 
+  filter(`% genotyped` == "0.5")
+
+```
+
+## Pedigree-based and Marker-based models
+
+### Open-Pollinated population
+
+```{r Plot.BV.and.correlations1, fig.height=12, fig.width=8}
+# additing clear labels for the facets
+add_prefix <- function(string) {
+  paste("Selfing Rate = ", scales::percent(as.numeric(string)))
+}
+# Plot true BV vs BV from Half-Sib model
+  ## Setting graph parameters
+title.size <- 14
+subtitle.size <- 12
+# create the dataset to plot
+BV.OP.plot <- BV.OP |>
+  dplyr::select(id, BV, BV.HS, BV.GBlup, BV.GDBlup, Simul, SelfRate) |>
+  pivot_longer(cols = c("BV.HS", "BV.GBlup", "BV.GDBlup", ),
+               names_to = "Model") |>
+  # Join with BV.ssGBlup.OP
+  full_join(
+    BV.ssGBlup.OP |>
+      dplyr::select(id, BV, BV.ssGDBlup, Simul, SelfRate) |>
+      pivot_longer(cols = c("BV.ssGDBlup"), names_to = "Model"),
+    by = c("id", "BV", "Simul", "Model", "SelfRate", "value")
+  ) |>
+  mutate(
+    Model = gsub("_50", "", gsub("BV.", "", Model)),
+    Model = case_when(
+      Model == "HS" ~ "Half-Sib", 
+      Model == "GBlup" ~ "GBLUP",
+      Model == "GDBlup" ~ "GDBLUP",
+      Model == "ssGDBlup" ~ "ssGDBLUP",
+      TRUE ~ Model
+      ),
+    Model = factor(
+      Model,
+      levels = c("GDBLUP", "GBLUP", "ssGDBLUP", "Half-Sib")
+    )
+  ) |>
+  # Include facet label
+  mutate(
+    FacetLabel = paste(
+      "Selfing rate =",
+      scales::percent(as.numeric(SelfRate)),
+      "\nModel =",
+      Model
+    ),
+    # Adjust facet order by specifying levels based on `Model`
+    FacetLabel = factor(
+      FacetLabel,
+      levels = unique(
+        paste(
+          "Selfing rate =",
+          scales::percent(as.numeric(SelfRate)),
+          "\nModel =",
+          c("GDBLUP", "GBLUP", "ssGDBLUP", "Half-Sib")
+        )
+      )
+    )
+  )
+
+BV.true_OP <- ggplot(
+  BV.OP.plot,
+  aes(x = BV, y = value, colour = Model)
+) +
+  geom_point(
+    alpha = 0.7,
+    show.legend = F
+  ) +
+  scale_color_manual(
+    breaks = c("GDBLUP", "GBLUP", "ssGDBLUP", "Half-Sib"),
+    values = c("blue", "red", "magenta4", "darkgreen"),
+    labels = c(
+      "GDBLUP model",
+      "GBLUP model",
+      "ssGDBLUP model",
+      "Half-Sib model"
+    )
+  ) +
+  geom_smooth(
+    method = "lm",
+    formula = y ~ poly(x, 1),
+    se = T,
+    #color = "grey90",
+    show.legend = F,
+  ) +
+  ggpubr::stat_cor(
+    cor.coef.name = expression(r[aa]),
+    aes(label = ..r.label..),
+    geom = "label",
+    size = 4, 
+    label.x = c(-8),
+    label.y = c(12, 10, 8, 6, 4),
+    show.legend = F, 
+  ) +
+  scale_y_continuous(
+    expand = c(0.1, 0)
+  ) +
+  facet_wrap(
+    ~ FacetLabel,
+    ncol = 4
+  ) +
+  labs(
+    title = "",
+    #subtitle = "Breeding values from Open-Pollinated Population",
+    x = "True Breeding values",
+    y = "Estimated Breeding values (EBV)"
+  ) +
+  theme(
+    plot.title = element_text(
+      hjust = 0,
+      size = title.size,
+      face = "bold"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5,
+      size = subtitle.size,
+      face = "plain"
+    )
+  ) +
+  theme_bw(base_size = 14)
+
+BV.true_OP
+
+ggsave(
+  plot = BV.true_OP,
+  filename = "Results/BV.OP.plot_2025.png",
+  dpi = 300,
+  height = 16,
+  width = 10
+)
+
+```
+
+# Dominance effects and correlations
+
+```{r Plot.dom.and.correlations1, fig.height=12, fig.width=8}
+# additing clear labels for the facets
+add_prefix <- function(string) {
+  paste("Selfing Rate = ", scales::percent(as.numeric(string)))
+}
+# Plot true BV vs BV from Half-Sib model
+  ## Setting graph parameters
+title.size <- 14
+subtitle.size <- 12
+# create the dataset to plot
+
+Dom.OP.plot <- BV.OP |>
+  dplyr::select(id, Dom_eff, DomEff.GD, Simul, SelfRate) |>
+  pivot_longer(cols = c("DomEff.GD"),
+               names_to = "Model") |>
+  # Join with BV.ssGBlup.OP
+  full_join(
+    BV.ssGBlup.OP |>
+      dplyr::select(id, Dom_eff, Dom.ssGDBlup, Simul, SelfRate) |>
+      pivot_longer(cols = c("Dom.ssGDBlup"), names_to = "Model"),
+    by = c("id", "Dom_eff", "Simul", "Model", "SelfRate", "value")
+  ) |>
+  mutate(
+    Model = case_when(
+      Model == "DomEff.GD" ~ "GDBLUP", 
+      Model == "Dom.ssGDBlup" ~ "ssGDBLUP",
+      TRUE ~ Model
+      ),
+    Model = factor(
+      Model,
+      levels = c("GDBLUP", "ssGDBLUP")
+    )
+  )
+
+# Create a data frame with the selfing rates and models
+data_facet <- data.frame(
+  SelfRate = sort(as.numeric(Dom.OP.plot$SelfRate)),
+  Model = rep(c("GDBLUP", "ssGDBLUP"), 
+              each = length(unique(Dom.OP.plot$SelfRate)))) |> 
+  mutate(
+    SelfRate = scales::percent(sort(as.numeric(Dom.OP.plot$SelfRate)))
+  )
+
+# Combine the selfing rate and model into a single string
+combined <- paste("Selfing rate =", data_facet$SelfRate, "\nModel =", data_facet$Model)
+
+# Ensure the order is maintained
+ordered_combined <- combined[order(sort(data_facet$SelfRate), data_facet$Model)]
+
+  # Include facet label
+Dom.OP.plot <- Dom.OP.plot |> 
+  mutate(
+    FacetLabel = paste(
+      "Selfing rate =",
+      scales::percent(as.numeric(SelfRate)),
+      "\nModel =",
+      Model
+    ),
+    # Adjust facet order by specifying levels based on `Model`
+    FacetLabel = factor(
+      FacetLabel,
+      levels = unique(ordered_combined)
+    )
+  )
+
+Dom.true_OP <- ggplot(
+  Dom.OP.plot,
+  aes(x = Dom_eff, y = value, colour = Model)
+) +
+  geom_point(
+    alpha = 0.7,
+    show.legend = F
+  ) +
+  scale_color_manual(
+    breaks = c("GDBLUP", "ssGDBLUP"),
+    values = c("blue", "magenta4"),
+    labels = c(
+      "GDBLUP model",
+      "ssGDBLUP model"
+    )
+  ) +
+  geom_smooth(
+    method = "lm",
+    formula = y ~ poly(x, 1),
+    se = T,
+    #color = "grey90",
+    show.legend = F,
+  ) +
+  ggpubr::stat_cor(
+    cor.coef.name = expression(rho),
+    aes(label = ..r.label..),
+    geom = "label",
+    size = 4, 
+    label.x = c(-8),
+    label.y = c(8, 6, 4),
+    show.legend = F, 
+  ) +
+  scale_y_continuous(
+    expand = c(0.1, 0)
+  ) +
+  facet_wrap(
+    ~ FacetLabel,
+    ncol = 2
+  ) +
+  labs(
+    title = "",
+    x = "True Dominance effect",
+    y = "Estimated Dominance Effect"
+  ) +
+  theme(
+    plot.title = element_text(
+      hjust = 0,
+      size = title.size,
+      face = "bold"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5,
+      size = subtitle.size,
+      face = "plain"
+    )
+  ) +
+  theme_bw(base_size = 14)
+
+Dom.true_OP
+
+ggsave(
+  plot = Dom.true_OP,
+  filename = "Results/Corr_Dom.OP.plot_2025.png",
+  dpi = 300,
+  height = 16,
+  width = 10
+)
+
+```
+
+# Genetic gain
+
+## Load the function `GenGainFunc.R`
+
+See description of this function in this repository
+
+```{r GenGainFuncR}
+source("GenGainFunc.R")
+```
+
+```{r GetGenGain.op, message=F, warning=F, eval=F}
+BV.OP.Full <- BV.OP |> 
+  full_join(
+    BV.ssGBlup.OP
+  )
+
+BV.OP.Full.list <- list()
+for (i in names(BV.OP.list)) {
+  bv.op.full.list <- BV.OP.list[[i]] |> 
+    full_join(
+      BV.ssGBlup.OP.list[[i]]
+    )
+  BV.OP.Full.list[[i]] <- bv.op.full.list
+}
+
+# Get genetic gain applying the `GenGainFun` function
+  ## Set up Selectin intensity
+SI <- c(0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.4, 0.5)
+GEN.GAIN.OP <- list()
+system.time(for (i in names(OP.SIMUL)) {
+  # for (j in names(OP.SIMUL[[i]])) {
+  for (k in as.character(SI)) {
+    GEN.GAIN.OP[[i]][[k]] <-
+      GenGainFunc(
+        Dt = OP.SIMUL[[i]][["Data"]],
+        BV. = BV.OP.list[[i]],
+        IS = as.numeric(k),
+        model = c("Pheno", "HS", "ssGDBlup", "GBlup", "GDBlup"),
+        use_ssGBLUP = TRUE,
+        Herit = OP.SIMUL[[i]][["Herit.All"]],
+        RealParameters = OP.SIMUL[[i]][["RealParameters"]],
+        #ssGBlup.simul = ssGBlup.OP[[i]],
+        BV.ssGBlup.model = BV.OP.Full.list[[i]],
+        Group_By = c("SelfRate")
+      )
+    #   }
+  }
+})
+# ~ 761.76 (13min)
+saveRDS(GEN.GAIN.OP, "GEN.GAIN.OP_2025.rda")
+
+```
+
+```{r load.GenGain.OP}
+GEN.GAIN.OP <- readRDS("GEN.GAIN.OP_2025.rda")
+```
+
+```{r GetGenGain.op2, message=F, warning=F}
+# Prepare data
+  ## Input within list
+GAIN.BV.OP <- list()
+GAIN.GV.OP <- list()
+GAP.BV.OP <- list()
+GAP.GV.OP <- list()
+for (i in names(GEN.GAIN.OP)) {
+  for (j in names(GEN.GAIN.OP[[i]])) {
+    #for (k in names(GEN.GAIN.OP[[i]][[j]])) {
+      GAIN.BV.OP[[i]][[j]] <- GEN.GAIN.OP[[i]][[j]][["GainResults"]] |> 
+        filter(TypeGain == "BV")
+      # GAP BV calculation
+      GAP.BV.OP[[i]][[j]] <- GEN.GAIN.OP[[i]][[j]][["GainResults"]] |> 
+        filter(TypeGain == "BV") |> 
+        dplyr::select(Model, SelfRate, SI, Realised_Gain) |> 
+        mutate(PotGenGain = max(Realised_Gain),
+               Gap = Realised_Gain - PotGenGain,
+               )
+      
+      GAIN.GV.OP[[i]][[j]] <- GEN.GAIN.OP[[i]][[j]][["GainResults"]] |> 
+        filter(TypeGain == "GV")
+      # GAP GV calculation
+      GAP.GV.OP[[i]][[j]] <- GEN.GAIN.OP[[i]][[j]][["GainResults"]] |> 
+        filter(TypeGain == "GV") |> 
+        dplyr::select(Model, SelfRate, SI, Realised_Gain) |> 
+          mutate(PotGenGain = max(Realised_Gain),
+               Gap = Realised_Gain - PotGenGain
+               )
+    #}
+  }
+}
+  ## bind rows
+GAIN.BV.OP <- lapply(GAIN.BV.OP, function(x)
+  lapply(x, function(y)
+    bind_rows(y)))
+
+GAIN.BV.OP <- lapply(GAIN.BV.OP, bind_rows) |> 
+  bind_rows() |> 
+    # Fix selfing rates of 76.0% to 75.0%; 6.0% to 5.0%; 51.0% to 50.0%; 26.0% to 25.0%; 11.0% to 10.0% and 1.0% to 0.0%
+  mutate(SelfRate = case_when(
+    SelfRate == "76.0%" ~ "75.0%",
+    SelfRate == "6.0%" ~ "5.0%",
+    SelfRate == "51.0%" ~ "50.0%",
+    SelfRate == "26.0%" ~ "25.0%",
+    SelfRate == "11.0%" ~ "10.0%",
+    SelfRate == "1.0%" ~ "0.0%",
+    TRUE ~ SelfRate
+  )) |>
+  # convert self rate (%0.0 format) to numeric
+  mutate(SelfRate = round(as.numeric(gsub("%", "", SelfRate)) / 100, 2))
+
+GAIN.GV.OP <- lapply(GAIN.GV.OP, function(x)
+  lapply(x, function(y)
+    bind_rows(y)))
+
+GAIN.GV.OP <- lapply(GAIN.GV.OP, bind_rows) |> 
+  bind_rows() |> 
+    # Fix selfing rates of 76.0% to 75.0%; 6.0% to 5.0%; 51.0% to 50.0%; 26.0% to 25.0%; 11.0% to 10.0% and 1.0% to 0.0%
+  mutate(SelfRate = case_when(
+    SelfRate == "76.0%" ~ "75.0%",
+    SelfRate == "6.0%" ~ "5.0%",
+    SelfRate == "51.0%" ~ "50.0%",
+    SelfRate == "26.0%" ~ "25.0%",
+    SelfRate == "11.0%" ~ "10.0%",
+    SelfRate == "1.0%" ~ "0.0%",
+    TRUE ~ SelfRate
+  )) |>
+  # convert self rate (%0.0 format) to numeric
+  mutate(SelfRate = round(as.numeric(gsub("%", "", SelfRate)) / 100, 2))
+```
+
+## Plot Genetic gain
+
+### Open-pollinated population
+
+```{r plot.gen.gain_SelfRate, fig.height=12, fig.width=7}
+SI.values <- c(0.01, 0.05, 0.1, 0.25, 0.5)
+# additing clear labels for the facets
+add_prefix <- function(string) {
+  paste("Selfing Rate = ", scales::percent(as.numeric(string)))
+}
+title.size <- 14
+subtitle.size <- 10
+axis.x.size <- 8
+axis.y.size <- 9
+# Plot genetic gain
+ggplot(
+  data = GAIN.BV.OP |>
+    filter(Model %in% c(
+      "True",
+      "GDBlup", "GBlup",
+      "ssGDBlup",
+      "HS", 
+      "Pheno"
+    )
+    & SI %in% SI.values
+    ) |>
+    mutate(SI = as.factor(SI),
+           Model = case_when(
+             Model == "GBlup" ~ "Genetic Gain using\nthe GBLUP model",
+             Model == "GDBlup" ~ "Genetic Gain using\nthe GDBLUP model",
+             Model == "ssGDBlup" ~ "Genetic Gain using\nthe ssGDBLUP model",
+             Model == "HS" ~ "Genetic Gain using\nthe Half-Sib model",
+             Model == "True" ~ "*Potential\nGenetic Gain",
+             Model == "Pheno" ~ "Genetic Gain using \nthe Phenotypic value",
+             TRUE ~ Model
+           ),
+           Model = factor(Model, levels = c(
+             "*Potential\nGenetic Gain",
+             "Genetic Gain using\nthe GDBLUP model",
+             "Genetic Gain using\nthe GBLUP model",
+             "Genetic Gain using\nthe ssGDBLUP model",
+             "Genetic Gain using\nthe Half-Sib model",
+             "Genetic Gain using \nthe Phenotypic value"
+           ))
+           ),
+  aes(x = SI,
+      y = Realised_Gain, 
+      fill = Model,
+      colour = Model
+      )
+) +
+  geom_boxplot(
+    alpha = 0.5,   
+    outlier.size = 0.8,
+    outlier.shape = NA,
+    position = position_dodge(width = 0.9)
+    
+               ) +
+  stat_summary(
+    aes(fill = Model),
+    geom = 'point',
+    fun = 'mean',
+    color = 'grey100',
+    position = position_dodge(width = 0.9),
+    size = 1,
+    shape = 1,
+    show.legend = T
+  ) +
+  facet_wrap(~ SelfRate,
+             labeller = as_labeller(add_prefix),
+             scales = "free_y",
+    ncol = 2) +
+  scale_x_discrete(
+    label = scales::percent(SI.values, accuracy = 0.1),
+                   guide = guide_axis(n.dodge = 1)) +
+  scale_y_continuous(
+    #breaks = c(0, 0.25, 0.5, 0.75),
+    label = scales::percent) +
+  scale_fill_manual(
+    name = "Genetic gain using:",
+    breaks = c(
+      "*Potential\nGenetic Gain",
+      "Genetic Gain using\nthe GDBLUP model",
+      "Genetic Gain using\nthe GBLUP model",
+      "Genetic Gain using\nthe ssGDBLUP model",
+      "Genetic Gain using\nthe Half-Sib model",
+      "Genetic Gain using \nthe Phenotypic value"
+    ),
+    labels = c(
+      "*Potential\nGenetic Gain",
+      "GDBLUP model",
+      "GBLUP model",
+      "ssGDBLUP model",
+      "Half-Sib model",
+      "Phenotypic value"
+    ),
+    values = c(
+      "gold4",
+      "blue",
+      "red",
+      "magenta4",
+      "darkgreen",
+      "gray30"
+    )
+  ) +
+  scale_color_manual(
+    name = "Genetic gain using:",
+    breaks = c(
+      "*Potential\nGenetic Gain",
+      "Genetic Gain using\nthe GDBLUP model",
+      "Genetic Gain using\nthe GBLUP model",
+      "Genetic Gain using\nthe ssGDBLUP model",
+      "Genetic Gain using\nthe Half-Sib model",
+      "Genetic Gain using \nthe Phenotypic value"
+    ),
+    labels = c(
+      "*Potential\nGenetic Gain",
+      "GDBLUP model",
+      "GBLUP model",
+      "ssGDBLUP model",
+      "Half-Sib model",
+      "Phenotypic value"
+    ),
+    values = c(
+      "gold4",
+      "blue",
+      "red",
+      "magenta4",
+      "darkgreen",
+      "gray30"
+    )
+  ) +
+  labs(
+    y = "Genetic Gain",
+    x = "Selection Intensity",
+    title = "",
+    #subtitle = "",
+    caption = "*Genetic gain by selecting the true top trees according to selection intensity"
+    
+  ) +
+  theme_bw(base_size = 13) +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(
+      hjust = 0,
+      size = title.size,
+      face = "bold"
+    ),
+    legend.direction = "horizontal",
+    plot.subtitle = element_text(
+      hjust = 0.5,
+      size = subtitle.size,
+      face = "plain"
+    ),
+    legend.title = element_text(size = 9),
+     plot.caption = element_text(size = 8),
+    axis.text.x = element_text(
+      size = axis.x.size
+    ),
+    axis.text.y = element_text(
+      size = axis.y.size
+    ),
+    legend.key.size = unit(3, "mm"),
+    legend.text = element_text(size = 8)
+  ) 
+
+# Save graph
+ggsave("Results/GenGain_per_SelfRate.OP.plot_2025.png",
+       dpi = 300,
+       height = 12,
+       width = 7
+       )
+```
+
+
+```{r plot.gen.gain_SI, fig.height=12, fig.width=7}
+SI.values <- c(0.01, 0.05, 0.1, 0.25, 0.5)
+# additing clear labels for the facets
+add_prefix <- function(string) {
+  paste("Selection Intensity = ", scales::percent(as.numeric(string)))
+}
+title.size <- 14
+subtitle.size <- 10
+axis.x.size <- 8
+axis.y.size <- 9
+# Plot genetic gain
+ggplot(
+  data = GAIN.BV.OP |>
+    filter(Model %in% c(
+      "True",
+      "GDBlup", "GBlup",
+      "ssGDBlup",
+      "HS", 
+      "Pheno"
+    )
+    & SI %in% SI.values
+    ) |>
+    mutate(SI = as.factor(SI),
+           SelfRate = as.factor(SelfRate),
+           Model = case_when(
+             Model == "GBlup" ~ "Genetic Gain using\nthe GBLUP model",
+             Model == "GDBlup" ~ "Genetic Gain using\nthe GDBLUP model",
+             Model == "ssGDBlup" ~ "Genetic Gain using\nthe ssGDBLUP model",
+             Model == "HS" ~ "Genetic Gain using\nthe Half-Sib model",
+             Model == "True" ~ "*Potential\nGenetic Gain",
+             Model == "Pheno" ~ "Genetic Gain using \nthe Phenotypic value",
+             TRUE ~ Model
+           ),
+           Model = factor(Model, levels = c(
+             "*Potential\nGenetic Gain",
+             "Genetic Gain using\nthe GDBLUP model",
+             "Genetic Gain using\nthe GBLUP model",
+             "Genetic Gain using\nthe ssGDBLUP model",
+             "Genetic Gain using\nthe Half-Sib model",
+             "Genetic Gain using \nthe Phenotypic value"
+           ))
+           ),
+  aes(x = SelfRate,
+      y = Realised_Gain, 
+      fill = Model,
+      colour = Model
+      )
+  ) +
+  geom_boxplot(
+    alpha = 0.5,   
+    outlier.size = 0.8,
+    outlier.shape = NA,
+    position = position_dodge(width = 0.9)
+    
+               ) +
+  stat_summary(
+    aes(fill = Model),
+    geom = 'point',
+    fun = 'mean',
+    color = 'grey100',
+    position = position_dodge(width = 0.9),
+    size = 1,
+    shape = 1,
+    show.legend = T
+  ) +
+  facet_wrap(~ SI,
+             labeller = as_labeller(add_prefix),
+             scales = "free_y",
+    ncol = 2) +
+  scale_x_discrete(
+    label = scales::percent(unique(GAIN.BV.OP$SelfRate), accuracy = 1),
+                   guide = guide_axis(n.dodge = 1)) +
+  scale_y_continuous(
+    #breaks = c(0, 0.25, 0.5, 0.75),
+    label = scales::percent) +
+  scale_fill_manual(
+    name = "Genetic gain using:",
+    breaks = c(
+      "*Potential\nGenetic Gain",
+      "Genetic Gain using\nthe GDBLUP model",
+      "Genetic Gain using\nthe GBLUP model",
+      "Genetic Gain using\nthe ssGDBLUP model",
+      "Genetic Gain using\nthe Half-Sib model",
+      "Genetic Gain using \nthe Phenotypic value"
+    ),
+    labels = c(
+      "*Potential\nGenetic Gain",
+      "GDBLUP model",
+      "GBLUP model",
+      "ssGDBLUP model",
+      "Half-Sib model",
+      "Phenotypic value"
+    ),
+    values = c(
+      "gold4",
+      "blue",
+      "red",
+      "magenta4",
+      "darkgreen",
+      "gray30"
+    )
+  ) +
+  scale_color_manual(
+    name = "Genetic gain using:",
+    breaks = c(
+      "*Potential\nGenetic Gain",
+      "Genetic Gain using\nthe GDBLUP model",
+      "Genetic Gain using\nthe GBLUP model",
+      "Genetic Gain using\nthe ssGDBLUP model",
+      "Genetic Gain using\nthe Half-Sib model",
+      "Genetic Gain using \nthe Phenotypic value"
+    ),
+    labels = c(
+      "*Potential\nGenetic Gain",
+      "GDBLUP model",
+      "GBLUP model",
+      "ssGDBLUP model",
+      "Half-Sib model",
+      "Phenotypic value"
+    ),
+    values = c(
+      "gold4",
+      "blue",
+      "red",
+      "magenta4",
+      "darkgreen",
+      "gray30"
+    )
+  ) +
+  labs(
+    y = "Genetic Gain",
+    x = "Selfing rate",
+    title = "",
+    #subtitle = "",
+    caption = "*Genetic gain by selecting the true top trees according to selection intensity"
+    
+  ) +
+  theme_bw(base_size = 14) +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(
+      hjust = 0,
+      size = title.size,
+      face = "bold"
+    ),
+    legend.direction = "horizontal",
+    plot.subtitle = element_text(
+      hjust = 0.5,
+      size = subtitle.size,
+      face = "plain"
+    ),
+    legend.title = element_text(size = 9),
+     plot.caption = element_text(size = 8),
+    axis.text.x = element_text(
+      size = axis.x.size
+    ),
+    axis.text.y = element_text(
+      size = axis.y.size
+    ),
+    legend.key.size = unit(3, "mm"),
+    legend.text = element_text(size = 8)
+  ) 
+
+# Save graph
+ggsave("Results/GenGain_per_SI.OP.plot_2025.png",
+       dpi = 300,
+       height = 12,
+       width = 7
+       )
+```
+
+# Genotypic Gain 
+
+## Plot genotypic gain
+
+### Open-Pollinated population
+
+```{r plot.geno.gain2, fig.height=12, fig.width=7.5}
+SI.values <- c(0.01, 0.05, 0.1, 0.25, 0.5)
+title.size <- 14
+subtitle.size <- 10
+axis.x.size <- 8
+axis.y.size <- 9
+# additing clear labels for the facets
+add_prefix <- function(string) {
+  paste("Selfing Rate = ", scales::percent(as.numeric(string)))
+}
+# Plot genetic gain
+ggplot(
+  data = GAIN.GV.OP |>
+    filter(!Model %in% c("GBlup")
+           & SI %in% SI.values
+           ) |>
+    mutate(SI = as.factor(SI),
+           Model = case_when(
+             Model == "GDBlup" ~ "Genotypic Gain using\nthe GDBLUP model",
+             Model == "ssGDBlup" ~ "Genotypic Gain using\nthe ssGDBLUP model",
+             Model == "HS" ~ "Genotypic Gain using\nthe Half-Sib model",
+             Model == "True" ~ "*Potential\nGenotypic Gain",
+             Model == "Pheno" ~ "Genotypic Gain using \nthe Phenotypic value",
+           ),
+           Model = factor(
+             Model,
+             levels = c(
+               "*Potential\nGenotypic Gain",
+               "Genotypic Gain using\nthe GDBLUP model",
+               "Genotypic Gain using\nthe ssGDBLUP model",
+               "Genotypic Gain using\nthe Half-Sib model",
+               "Genotypic Gain using \nthe Phenotypic value"
+             )
+           )),
+  aes(x = SI,
+      y = Realised_Gain, 
+      fill = Model,
+      colour = Model
+      )
+  ) +
+  geom_boxplot(
+    alpha = 0.5,   
+    position = position_dodge(width = 0.9),
+    outlier.size = 0.8,
+    outlier.shape = NA
+    ) +
+  stat_summary(
+    aes(fill = Model),
+    geom = 'point',
+    fun = 'mean',
+    color = 'grey100',
+    position = position_dodge(width = 0.9),
+    size = 1,
+    shape = 1,
+    show.legend = T
+  ) +
+  facet_wrap(~ SelfRate,
+             labeller = as_labeller(add_prefix),
+             scales = "free_y",
+    ncol = 2) +
+  scale_x_discrete(
+    label = scales::percent(SI.values, accuracy = 0.1),
+                   guide = guide_axis(n.dodge = 1)) +
+  scale_y_continuous(
+    #breaks = c(0, 0.25, 0.5, 0.75),
+    label = scales::percent) +
+  scale_fill_manual(
+    name = "Genotypic gain using:",
+    breaks = c(
+      "*Potential\nGenotypic Gain",
+      "Genotypic Gain using\nthe GDBLUP model",
+      "Genotypic Gain using\nthe ssGDBLUP model",
+      "Genotypic Gain using\nthe Half-Sib model",
+      "Genotypic Gain using \nthe Phenotypic value"
+    ),
+    labels = c(
+      "*Potential Genotypic Gain",
+      "GDBLUP model",
+      "ssGDBLUP model",
+      "Half-Sib model",
+      "Phenotypic value"
+    ),
+    values = c(
+      "gold4",
+      "blue",
+      "magenta4",
+      "darkgreen",
+      "gray30"
+    )
+  ) +
+  scale_color_manual(
+    name = "Genotypic gain using:",
+    breaks = c(
+      "*Potential\nGenotypic Gain",
+      "Genotypic Gain using\nthe GDBLUP model",
+      "Genotypic Gain using\nthe ssGDBLUP model",
+      "Genotypic Gain using\nthe Half-Sib model",
+      "Genotypic Gain using \nthe Phenotypic value"
+    ),
+    labels = c(
+      "*Potential Genotypic Gain",
+      "GDBLUP model",
+      "ssGDBLUP model",
+      "Half-Sib model",
+      "Phenotypic value"
+    ),
+    values = c(
+      "gold4",
+      "blue",
+      "magenta4",
+      "darkgreen",
+      "gray30"
+    )
+  ) +
+  labs(
+    y = "Genotypic Gain",
+    x = "Selection Intensity",
+    title = "a)",
+    #subtitle = "",
+    caption = "*Genotypic gain by selecting the true top trees according to selection intensity"
+    
+  ) +
+  theme_bw(base_size = 13) +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(
+      hjust = 0,
+      size = title.size,
+      face = "bold"
+    ),
+    legend.direction = "horizontal",
+    plot.subtitle = element_text(
+      hjust = 0.5,
+      size = subtitle.size,
+      face = "plain"
+    ),
+    legend.title = element_text(size = 9),
+    plot.caption = element_text(size = 7),
+    axis.text.x = element_text(
+      size = axis.x.size
+    ),
+    axis.text.y = element_text(
+      size = axis.y.size
+    ),
+    legend.key.size = unit(3, "mm"),
+    legend.text = element_text(size = 7)
+  ) 
+# Save graph
+ggsave("Results/GenoGain.OP.plot_2025.png",
+       dpi = 300,
+       height = 12,
+       width = 7.5
+       )
+```
+
+
+```{r plot.geno.gain.SI, fig.height=12, fig.width=7}
+SI.values <- c(0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.5)
+title.size <- 14
+subtitle.size <- 10
+axis.x.size <- 8
+axis.y.size <- 9
+# additing clear labels for the facets
+add_prefix <- function(string) {
+  paste("Selection Intensity = ", scales::percent(as.numeric(string)))
+}
+# Plot genetic gain
+ggplot(
+  data = GAIN.GV.OP |>
+    filter(!Model %in% c("GBlup")
+           & SI %in% SI.values
+           ) |>
+    mutate(SI = as.factor(SI),
+           SelfRate = as.factor(SelfRate),
+           Model = case_when(
+             Model == "GDBlup" ~ "Genotypic Gain using\nthe GDBLUP model",
+             Model == "ssGDBlup" ~ "Genotypic Gain using\nthe ssGDBLUP model",
+             Model == "HS" ~ "Genotypic Gain using\nthe Half-Sib model",
+             Model == "True" ~ "*Potential\nGenotypic Gain",
+             Model == "Pheno" ~ "Genotypic Gain using \nthe Phenotypic value",
+           ),
+           Model = factor(
+             Model,
+             levels = c(
+               "*Potential\nGenotypic Gain",
+               "Genotypic Gain using\nthe GDBLUP model",
+               "Genotypic Gain using\nthe ssGDBLUP model",
+               "Genotypic Gain using\nthe Half-Sib model",
+               "Genotypic Gain using \nthe Phenotypic value"
+             )
+           )),
+  aes(x = SelfRate,
+      y = Realised_Gain, 
+      fill = Model,
+      colour = Model
+      )
+  ) +
+  geom_boxplot(
+    alpha = 0.5,   
+    position = position_dodge(width = 0.9),
+    outlier.size = 0.8,
+    outlier.shape = NA
+    ) +
+  stat_summary(
+    aes(fill = Model),
+    geom = 'point',
+    fun = 'mean',
+    color = 'grey100',
+    position = position_dodge(width = 0.9),
+    size = 1,
+    shape = 1,
+    show.legend = T
+  ) +
+  facet_wrap(~ SI,
+             labeller = as_labeller(add_prefix),
+             scales = "free_y",
+    ncol = 2) +
+  scale_x_discrete(
+    label = scales::percent(unique(GAIN.GV.OP$SelfRate), accuracy = 1),
+                   guide = guide_axis(n.dodge = 1)) +
+  scale_y_continuous(
+    #breaks = c(0, 0.25, 0.5, 0.75),
+    label = scales::percent) +
+  scale_fill_manual(
+    name = "Genotypic gain using:",
+    breaks = c(
+      "*Potential\nGenotypic Gain",
+      "Genotypic Gain using\nthe GDBLUP model",
+      "Genotypic Gain using\nthe ssGDBLUP model",
+      "Genotypic Gain using\nthe Half-Sib model",
+      "Genotypic Gain using \nthe Phenotypic value"
+    ),
+    labels = c(
+      "*Potential Genotypic Gain",
+      "GDBLUP model",
+      "ssGDBLUP model",
+      "Half-Sib model",
+      "Phenotypic value"
+    ),
+    values = c(
+      "gold4",
+      "blue",
+      "magenta4",
+      "darkgreen",
+      "gray30"
+    )
+  ) +
+  scale_color_manual(
+    name = "Genotypic gain using:",
+    breaks = c(
+      "*Potential\nGenotypic Gain",
+      "Genotypic Gain using\nthe GDBLUP model",
+      "Genotypic Gain using\nthe ssGDBLUP model",
+      "Genotypic Gain using\nthe Half-Sib model",
+      "Genotypic Gain using \nthe Phenotypic value"
+    ),
+    labels = c(
+      "*Potential Genotypic Gain",
+      "GDBLUP model",
+      "ssGDBLUP model",
+      "Half-Sib model",
+      "Phenotypic value"
+    ),
+    values = c(
+      "gold4",
+      "blue",
+      "magenta4",
+      "darkgreen",
+      "gray30"
+    )
+  ) +
+  labs(
+    y = "Genotypic Gain",
+    x = "Selection Intensity",
+    title = "a)",
+    #subtitle = "",
+    caption = "*Genotypic gain by selecting the true top trees according to selection intensity"
+    
+  ) +
+  theme_bw(base_size = 13) +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(
+      hjust = 0,
+      size = title.size,
+      face = "bold"
+    ),
+    legend.direction = "horizontal",
+    plot.subtitle = element_text(
+      hjust = 0.5,
+      size = subtitle.size,
+      face = "plain"
+    ),
+    legend.title = element_text(size = 9),
+    plot.caption = element_text(size = 7),
+    axis.text.x = element_text(
+      size = axis.x.size
+    ),
+    axis.text.y = element_text(
+      size = axis.y.size
+    ),
+    legend.key.size = unit(3, "mm"),
+    legend.text = element_text(size = 7)
+  ) 
+# Save graph
+ggsave("Results/GenoGain.SI.OP.plot_2025.png",
+       dpi = 300,
+       height = 12,
+       width = 7
+       )
+```
+
+# Gap of genetic gain: Deployment for breeding population
+
+```{r Gap.prep.dt}
+# Prepare data
+  ## BV OP
+GAP.BV.OP2 <- lapply(GAP.BV.OP, function(x)
+  lapply(x, function(x)
+    bind_rows(x)))
+
+GAP.BV.OP2 <- lapply(GAP.BV.OP2, bind_rows) |> 
+  bind_rows() |> 
+  mutate(SelfRate = case_when(
+    # Rounding values to the correct categories of selfing
+    SelfRate == "5.1%" ~ "5.0%",
+    SelfRate == "50.1%" ~ "50.0%",
+    SelfRate == "0.2%" ~ "0.0%",
+    SelfRate == "25.2%" ~ "25.0%",
+    SelfRate == "10.2%" ~ "10.0%",
+    SelfRate == "25.1%" ~ "25.0%",
+    SelfRate == "0.1%" ~ "0.0%",
+    SelfRate == "50.2%" ~ "50.0%",
+    SelfRate == "10.1%" ~ "10.0%",
+    SelfRate == "5.0%" ~ "5.0%",
+    SelfRate == "5.2%" ~ "5.0%",
+    SelfRate == "75.1%" ~ "75.0%",
+    SelfRate == "0.3%" ~ "0.0%",
+    TRUE ~ SelfRate
+  )) |>
+  # convert self rate (%0.0 format) to numeric
+  mutate(SelfRate = round(as.numeric(gsub("%", "", SelfRate)) / 100, 2))
+
+  ## GV OP
+GAP.GV.OP2 <- lapply(GAP.GV.OP, function(x)
+  lapply(x, function(x)
+    bind_rows(x)))
+
+GAP.GV.OP2 <- lapply(GAP.GV.OP2, bind_rows) |> 
+  bind_rows() |> 
+  mutate(SelfRate = case_when(
+    # Rounding values to the correct categories of selfing
+    SelfRate == "5.1%" ~ "5.0%",
+    SelfRate == "50.1%" ~ "50.0%",
+    SelfRate == "0.2%" ~ "0.0%",
+    SelfRate == "25.2%" ~ "25.0%",
+    SelfRate == "10.2%" ~ "10.0%",
+    SelfRate == "25.1%" ~ "25.0%",
+    SelfRate == "0.1%" ~ "0.0%",
+    SelfRate == "50.2%" ~ "50.0%",
+    SelfRate == "10.1%" ~ "10.0%",
+    SelfRate == "5.0%" ~ "5.0%",
+    SelfRate == "5.2%" ~ "5.0%",
+    SelfRate == "75.1%" ~ "75.0%",
+    SelfRate == "0.3%" ~ "0.0%",
+    TRUE ~ SelfRate
+  )) |>
+  # convert self rate (%0.0 format) to numeric
+  mutate(SelfRate = round(as.numeric(gsub("%", "", SelfRate)) / 100, 2))
+```
+
+## Open-Pollinated population
+
+```{r Plot_GAP.OP2, fig.height=9, fig.width=8.5, warning=F, message=F}
+  ## Setting graph parameters
+title.size <- 14
+subtitle.size <- 10
+axis.x.size <- 8
+axis.y.size <- 9
+
+# additing clear labels for the facets
+add_prefix <- function(string) {
+  paste("Selfing rate = ", scales::percent(as.numeric(string)))
+}
+
+# Data for label
+GAP.BV.OP.Mean <- GAP.BV.OP2 |>
+  filter(SI > 0.005) |> 
+  mutate(
+    Model = case_when(
+      Model == "Pheno" ~ "Phenotype",
+      TRUE ~ Model
+    )
+  ) |> 
+  filter(Model %in% 
+           c(
+             "Potential Genetic Gain",
+             "GDBlup",
+             "GBlup",
+             "ssGDBlup",
+             "HS",
+             "Phenotype"
+            )
+           ) |> 
+  group_by(Model, SI, SelfRate) |>
+  summarise(Gap = mean(Gap, na.rm = T)) |> 
+  data.frame() |>
+  group_by(Model, SelfRate) |>
+  summarise(
+            Gap.label = paste("",
+                              scales::percent(max(Gap), suffix = ""),
+                              "to",
+                              scales::percent(min(Gap), suffix = "%")),
+            Gap = case_when(
+              Model == "Phenotype" ~ -0.42,
+              Model == "HS" ~ -0.36,
+              Model == "ssGDBlup" ~ -0.30,
+              Model == "GBlup" ~ -0.24,
+              Model == "GDBlup" ~ -0.18,
+              Model == "Potential Genetic Gain" ~ NA
+            )) |>
+  mutate(Model = case_when(
+             Model == "GBlup" ~ "Gap by using\nthe GBLUP model",
+             Model == "GDBlup" ~ "Gap by using\nthe GDBLUP model",
+             Model == "ssGDBlup" ~ "Gap by using\nthe ssGDBLUP model",
+             Model == "HS" ~ "Gap by using\nthe Half-Sib model",
+             Model == "Phenotype" ~ "Gap by using\nthe phenotypic value",
+             Model == "Potential Genetic Gain" ~ "*Potential\nGenetic Gain"
+           )) |> 
+  data.frame() |>
+  distinct(paste(Model, SelfRate), .keep_all = T) |> 
+  mutate(SI = 0.40,
+         Gap.label = ifelse(Model == "Potential Genetic Gain", NA, Gap.label))
+
+ggplot(
+  GAP.BV.OP2 |>
+    filter(SI > 0.005) |> 
+    mutate(
+    Model = case_when(
+      Model == "Pheno" ~ "Phenotype",
+      TRUE ~ Model
+    )
+  ) |> 
+    filter(Model %in% 
+           c(
+             "Potential Genetic Gain",
+             "GDBlup",
+             "GBlup",
+             "ssGDBlup",
+             "HS",
+             "Phenotype"
+            )
+           ) |> 
+    mutate(Model = case_when(
+             Model == "GBlup" ~ "Gap by using\nthe GBLUP model",
+             Model == "GDBlup" ~ "Gap by using\nthe GDBLUP model",
+             Model == "ssGDBlup" ~ "Gap by using\nthe ssGDBLUP model",
+             Model == "HS" ~ "Gap by using\nthe Half-Sib model",
+             Model == "Phenotype" ~ "Gap by using\nthe phenotypic value",
+             Model == "Potential Genetic Gain" ~ "*Potential\nGenetic Gain"
+           )) |> 
+    mutate(SI = as.numeric(SI)), 
+    aes(x = SI, y = Gap, colour = Model)
+  ) +
+  geom_point(
+    show.legend = T
+    ) +
+  geom_smooth(
+    method = "lm",
+    formula = y ~ poly(x, 2),
+    se = T,
+  ) +
+  geom_label(
+    data = GAP.BV.OP.Mean, 
+    aes(label = Gap.label),
+    size = 3,
+    show.legend = F
+  ) +
+  facet_wrap(
+    ~ SelfRate,
+    labeller = as_labeller(add_prefix),
+    ncol = 2
+  ) +
+  scale_x_reverse(
+    breaks = c(0.5, 0.4, 0.25, 0.1, 0.05, 0.01),
+    guide = guide_axis(n.dodge = 1),
+    label = scales::percent) +
+  #ylim(c(-0.60, 0)) +
+  scale_y_continuous(
+    limits = c(-0.45, 0.001),
+    #breaks = c(0, 0.25, 0.5, 0.75),  
+    label = scales::percent) +
+  scale_fill_manual(
+    name = "Gap by using:",
+    breaks = c(
+      "*Potential\nGenetic Gain",
+      "Gap by using\nthe GDBLUP model",
+      "Gap by using\nthe GBLUP model",
+      "Gap by using\nthe ssGDBLUP model",
+      "Gap by using\nthe Half-Sib model",
+      "Gap by using\nthe phenotypic value"
+    ),
+    labels = c(
+      "*Potential\nGenetic Gain",
+      "GDBLUP model",
+      "GBLUP model",
+      "ssGDBLUP model",
+      "Half-Sib model",
+      "phenotypic value"
+    ),
+    values = c(
+      "gold4",
+      "blue",
+      "red",
+      "magenta4",
+      "darkgreen",
+      "grey30"
+    )
+  ) +
+  scale_color_manual(
+    name = "Gap by using:",
+    breaks = c(
+      "*Potential\nGenetic Gain",
+      "Gap by using\nthe GDBLUP model",
+      "Gap by using\nthe GBLUP model",
+      "Gap by using\nthe ssGDBLUP model",
+      "Gap by using\nthe Half-Sib model",
+      "Gap by using\nthe phenotypic value"
+    ),
+    labels = c(
+      "*Potential\nGenetic Gain",
+      "GDBLUP model",
+      "GBLUP model",
+      "ssGDBLUP model",
+      "Half-Sib model",
+      "phenotypic value"
+    ),
+    values = c(
+      "gold4",
+      "blue",
+      "red",
+      "magenta4",
+      "darkgreen",
+      "grey30"
+    )
+  ) +
+  labs(
+    title = "",
+    #subtitle = "GAP of genetic gain from Open-Pollinated Population: \nDeployment of selected trees as parents for the next generation of the breeding population",
+    caption = "*Genetic gain by selecting the true top trees according to selection intensity",
+    x = "Selection intensity",
+    y = "GAP of Genetic Gain"
+  ) +
+  theme_bw(base_size = 13) +
+  theme(
+    legend.position = "bottom",
+    legend.key.size = unit(0.5, "cm"),
+    plot.title = element_text(
+      hjust = 0,
+      size = title.size,
+      face = "bold"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5,
+      size = subtitle.size,
+      face = "plain"
+    ),
+    plot.caption = element_text(hjust = 0),
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 9)
+  ) +
+  # Include GAP Range From:
+  annotate(
+    geom = "text",
+    y = -0.24,
+    x = 0.48,
+    #label = "GAP\nRange\nFrom:",
+    label = "",
+    size = 3
+  )
+
+#Save graph
+ggsave("Results/GAP.OP.plot_2025.png",
+       dpi = 300,
+       height = 9,
+       width = 8.5
+       )
+
+```
+
+# Gap of genotypic gain: Deployment for clonning
+
+## Open-Pollinated population
+
+
+```{r Plot.GAP.GV.OP, fig.height=9, fig.width=8.5, warning=F, message=F}
+  ## Setting graph parameters
+title.size <- 14
+# subtitle.size <- 12
+
+# additing clear labels for the facets
+add_prefix <- function(string) {
+  paste("Selfing rate = ", scales::percent(as.numeric(string)))
+}
+
+# Data for label
+GAP.GV.OP.Mean <- GAP.GV.OP2 |>
+  mutate(
+    Model = case_when(
+      Model == "Pheno" ~ "Phenotype",
+      TRUE ~ Model
+    )
+  ) |> 
+  filter(SI > 0.005) |> 
+  group_by(Model, SI, SelfRate) |>
+  summarise(Gap = mean(Gap, na.rm = T)) |> 
+  data.frame() |>
+  group_by(Model, SelfRate) |>
+  summarise(
+            Gap.label = paste("",
+                              scales::percent(max(Gap), suffix = ""),
+                              "to",
+                              scales::percent(min(Gap), suffix = "%")),
+            Gap = case_when(
+              Model == "Phenotype" ~ -0.37,
+              Model == "HS" ~ -0.31,
+              Model == "ssGDBlup" ~ -0.25,
+              Model == "GDBlup" ~ -0.18,
+              Model == "Potential Genotypic Gain" ~ NA
+            )) |>
+  mutate(Model = case_when(
+             Model == "GDBlup" ~ "Gap by using\nthe GDBLUP model",
+             Model == "HS" ~ "Gap by using\nthe Half-Sib model",
+             Model == "Phenotype" ~ "Gap by using\nthe phenotypic value",
+             Model == "Potential Genotypic Gain" ~ "Potential\nGenotypic Gain",
+             Model == "ssGDBlup" ~ "Gap by using\nthe ssGDBLUP model",
+             TRUE ~ Model
+           )) |> 
+  data.frame() |>
+  distinct(paste(Model, SelfRate), .keep_all = T) |> 
+  mutate(SI = 0.4,
+         Gap.label = ifelse(Model == "True", NA, Gap.label))
+
+ggplot(
+  GAP.GV.OP2 |> 
+    filter(SI > 0.005) |>
+    mutate(
+    Model = case_when(
+      Model == "Pheno" ~ "Phenotype",
+      TRUE ~ Model
+    ),
+    Gap = ifelse(Model == "True", NA, Gap)
+  ) |>
+    mutate(Model = case_when(
+             Model == "GDBlup" ~ "Gap by using\nthe GDBLUP model",
+             Model == "HS" ~ "Gap by using\nthe Half-Sib model",
+             Model == "Phenotype" ~ "Gap by using\nthe phenotypic value",
+             Model == "Potential Genotypic Gain" ~ "Potential\nGenotypic Gain",
+             Model == "ssGDBlup" ~ "Gap by using\nthe ssGDBLUP model",
+             TRUE ~ Model
+           )) |> 
+    mutate(SelfRate = as.numeric(SelfRate)),
+  aes(x = SI, y = Gap, colour = Model)
+) +
+  geom_point(
+    show.legend = T
+  ) +
+  geom_smooth(
+    method = "lm",
+    formula = y ~ poly(x, 2),
+    se = T,
+  ) +
+  geom_label(
+    data = GAP.GV.OP.Mean,
+    aes(label = Gap.label),
+    size = 2.5,
+    show.legend = F
+  ) +
+  facet_wrap(
+    ~ SelfRate,
+    labeller = as_labeller(add_prefix),
+    ncol = 2
+  ) +
+  scale_x_reverse(
+    breaks = c(0.5, 0.4, 0.25, 0.1, 0.05, 0.01),
+    guide = guide_axis(n.dodge = 1),
+    label = scales::percent) +
+  #ylim(c(-0.60, 0)) +
+  scale_y_continuous(
+    limits = c(-0.45, 0.001),
+    #breaks = c(0, 0.25, 0.5, 0.75),  
+    label = scales::percent) +
+  scale_fill_manual(
+    name = "Gap by using:",
+    breaks = c(
+      "Potential\nGenotypic Gain",
+      "Gap by using\nthe GDBLUP model",
+      "Gap by using\nthe ssGDBLUP model",
+      "Gap by using\nthe Half-Sib model",
+      "Gap by using\nthe phenotypic value"
+    ),
+    labels = c(
+      "Potential\nGenotypic Gain",
+      "GDBLUP",
+      "ssGDBLUP model",
+      "Half-Sib model",
+      "phenotypic value"
+    ),
+    values = c(
+      "gold4",
+      "blue",
+      "magenta4",
+      "darkgreen",
+      "grey30"
+    )
+  ) +
+  scale_color_manual(
+    name = "Gap by using:",
+    breaks = c(
+      "Potential\nGenotypic Gain",
+      "Gap by using\nthe GDBLUP model",
+      "Gap by using\nthe ssGDBLUP model",
+      "Gap by using\nthe Half-Sib model",
+      "Gap by using\nthe phenotypic value"
+    ),
+    labels = c(
+      "Potential\nGenotypic Gain",
+      "GDBLUP",
+      "ssGDBLUP model",
+      "Half-Sib model",
+      "phenotypic value"
+    ),
+    values = c(
+      "gold4",
+      "blue",
+      "magenta4",
+      "darkgreen",
+      "grey30"
+    )
+  ) +
+  labs(
+    title = "",
+    #subtitle = "GAP of genotypic gain from Open-Pollinated Population: \nDeployment of selected trees for clonal planting",
+    #caption = "*Genetic gain by selecting the true top trees according to selection intensity",
+    x = "Selection intensity",
+    y = "GAP of Genotypic Gain"
+  ) +
+  theme_bw(base_size = 13) +
+  theme(
+    legend.position = "bottom",
+    legend.key.size = unit(0.5, "cm"),
+    plot.title = element_text(
+      hjust = 0,
+      size = title.size,
+      face = "bold"
+    ),
+    plot.subtitle = element_text(
+      hjust = 0.5,
+      size = subtitle.size,
+      face = "plain"
+    ),
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 9)
+  ) +
+   # Include GAP Range From:
+  annotate(
+    geom = "text",
+    y = -0.24,
+    x = 0.48,
+    #label = "GAP\nRange\nFrom:",
+    label = "",
+    size = 3
+  )
+
+# Save graph
+ggsave("Results/GAP.Genotypic.OP.plot_2025.png",
+       dpi = 300,
+       height = 9,
+       width = 8.5
+       )
+```
+
+# Inbreeding depression
+
+```{r homozigosityI, eval=FALSE}
+# Calculate homozygosity and heterozygosity
+calculate_homo_and_hetero <- function(geno_matrix) {
+  apply(geno_matrix, 1, function(genotype) {
+    n_0_loci <- sum(genotype == 0)
+    n_1_loci <- sum(genotype == 1)
+    n_2_loci <- sum(genotype == 2)
+    homozygous_loci <- sum(genotype == 0 | genotype == 2)
+    heterozygous_loci <- sum(genotype == 1)
+    total_loci <- length(genotype)
+    total_loci2 <- sum(genotype == 1 | genotype == 2)
+    homozygosity <- homozygous_loci / total_loci
+    heterozygosity <- heterozygous_loci / total_loci
+    homozygosity2 <- n_2_loci / total_loci2
+    heterozygosity2 = n_1_loci / total_loci2
+    return(c(
+      n_0_loci = n_0_loci,
+      n_1_loci = n_1_loci,
+      n_2_loci = n_2_loci,
+      Homozygosity = homozygosity,
+      Heterozygosity = heterozygosity,
+      Homozygosity2 = homozygosity2,
+      Heterozygosity2 = heterozygosity2))
+  })
+}
+
+
+HOMO_HETERO <- list()
+system.time(for (i in names(OP.SIMUL)) {
+    # Quality control
+    QC <- ASRgenomics::qc.filtering(
+    M = OP.SIMUL[[i]][["snps"]],
+    base = FALSE,
+    na.string = NA,
+    map = NULL,
+    marker = NULL,
+    chrom = NULL,
+    pos = NULL,
+    ref = NULL,
+    marker.callrate = 0.9,
+    ind.callrate = 0.9,
+    maf = 0.1,
+    heterozygosity = 1,
+    Fis = 1,
+    impute = FALSE,
+    Mrecode = FALSE,
+    plots = TRUE,
+    digits = 2,
+    message = TRUE
+  )
+  
+  # Assuming geno_matrix is your genotype data
+  homo_hetero_values <- t(calculate_homo_and_hetero(QC[["M.clean"]]))
+  
+  # Combine results with selfing rates
+  results <- data.frame(
+    SelfingRate = OP.SIMUL[[i]][["SelfRate"]],
+    n_0_loci = homo_hetero_values[, "n_0_loci"],
+    n_1_loci = homo_hetero_values[, "n_1_loci"],
+    n_2_loci = homo_hetero_values[, "n_2_loci"],
+    Homozygosity = homo_hetero_values[, "Homozygosity"],
+    Heterozygosity = homo_hetero_values[, "Heterozygosity"],
+    Homozygosity2 = homo_hetero_values[, "Homozygosity2"],
+    Heterozygosity2 = homo_hetero_values[, "Heterozygosity2"]
+  ) |>
+    rownames_to_column(var = "id") |>
+    mutate(Simul = trimws(gsub("*.*Rep", "", names(OP.SIMUL[i])))) |>
+    # Include pedigree
+    full_join(OP.SIMUL[[i]][["Data"]] |>
+                dplyr::select(id, father, mother, Pheno), by = "id") |>
+    relocate(c(father, mother), .after = "id") |>
+    # Include 1+Fi
+    full_join(OP.SIMUL[[i]][["BV_ALL.ssGBLUP"]] |>
+                dplyr::select(id, `1+Fi`), by = "id")
+  
+  # Fill the list
+  HOMO_HETERO[[i]] <- results
+})
+
+# Save list
+qsave(HOMO_HETERO, file = "HOMO_HETERO.qs")
+
+# 851.2s
+```
+
+
+```{r homozigosityII}
+# Load list of homogeneity-heterogeneity results
+HOMO_HETERO <- qread("HOMO_HETERO.qs")
+
+homo_hetero_data <- bind_rows(
+  HOMO_HETERO
+) |> 
+  # convert self rate (%0.0 format) to numeric
+  mutate(SelfingRate = round(as.numeric(gsub("%", "", SelfingRate)) / 100, 2))
+
+# Get the averages
+summary_by_selfing <- homo_hetero_data |>
+  group_by(SelfingRate) |>
+  summarize(
+    # Calculate total
+    N.Homozygosity = as.character(sum()),
+    # Calculate variance
+    Var.Homozygosity = as.character(round(var(Homozygosity), 2)),
+    Var.Heterozygosity = as.character(round(var(Heterozygosity), 2)),
+    Var.Homozygosity2 = as.character(round(var(Homozygosity2), 2)),
+    Var.Heterozygosity2 = as.character(round(var(Heterozygosity2), 2)),
+    # Calculate deviation
+    SD.Homozygosity = as.character(round(sd(Homozygosity), 2)),
+    SD.Heterozygosity = as.character(round(sd(Heterozygosity), 2)),
+    SD.Homozygosity2 = as.character(round(sd(Homozygosity2), 2)),
+    SD.Heterozygosity2 = as.character(round(sd(Heterozygosity2), 2)),
+     # Calculate averages
+    Homozygosity = as.character(round(median(Homozygosity), 2)),
+    Heterozygosity = as.character(round(median(Heterozygosity), 2)),
+    Homozygosity2 = as.character(round(median(Homozygosity2), 2)),
+    Heterozygosity2 = as.character(round(median(Heterozygosity2), 2)),
+    # Write the labels
+    L.Homozygosity = paste0(Homozygosity, " (", scales::percent(as.numeric(SD.Homozygosity), accuracy = 1), ")"),
+    L.Heterozygosity = paste0(Heterozygosity, " (", scales::percent(as.numeric(SD.Heterozygosity), accuracy = 1), ")"),
+    L.Homozygosity2 = paste0(Homozygosity2, " (", scales::percent(as.numeric(SD.Homozygosity2), accuracy = 1), ")"),
+    L.Heterozygosity2 = paste0(Heterozygosity2, " (", scales::percent(as.numeric(SD.Heterozygosity2), accuracy = 1), ")"),
+    .groups = 'drop'
+  ) |>
+  pivot_longer(
+    cols = -c("SelfingRate"),
+    names_to = "Metric",
+    values_to = "Proportion"
+  )
+
+# Summary tracking selding non-selfing
+  # Get the averages and standard deviation
+summary_by_selfing_id <- homo_hetero_data |>
+  mutate(
+    # Track selfing and non-selfing
+    Selfing_id = case_when(
+      father == mother ~ "Selfing",
+      TRUE ~ "Non-selfing"
+    )
+  ) |> 
+  group_by(SelfingRate, Selfing_id) |>
+  summarize(
+    # Calculate deviation
+    SD.Homozygosity = as.character(round(sd(Homozygosity), 2)),
+    SD.Heterozygosity = as.character(round(sd(Heterozygosity), 2)),
+    SD.Homozygosity2 = as.character(round(sd(Homozygosity2), 2)),
+    SD.Heterozygosity2 = as.character(round(sd(Heterozygosity2), 2)),
+     # Calculate averages
+    Homozygosity = as.character(round(mean(Homozygosity), 2)),
+    Heterozygosity = as.character(round(mean(Heterozygosity), 2)),
+    Homozygosity2 = as.character(round(mean(Homozygosity2), 2)),
+    Heterozygosity2 = as.character(round(mean(Heterozygosity2), 2)),
+    .groups = 'drop') |> 
+  mutate(
+    # Write the labels
+    L.Homozygosity = paste0(Homozygosity, " (", scales::percent(as.numeric(SD.Homozygosity), accuracy = 1), ")"),
+    L.Heterozygosity = paste0(Heterozygosity, " (", scales::percent(as.numeric(SD.Heterozygosity), accuracy = 1), ")"),
+    L.Homozygosity2 = paste0(Homozygosity2, " (", scales::percent(as.numeric(SD.Homozygosity2), accuracy = 1), ")"),
+    L.Heterozygosity2 = paste0(Heterozygosity2, " (", scales::percent(as.numeric(SD.Heterozygosity2), accuracy = 1), ")"),
+  ) |>
+  pivot_longer(
+    cols = -c("SelfingRate", "Selfing_id"),
+    names_to = "Metric",
+    values_to = "Proportion"
+  )
+
+# Data for distributions for Homozygosity and Heterozygosity (1 and 2) by Selfing Rate
+homo_hetero_long <- homo_hetero_data |> 
+  mutate(
+    # Track selfing and non-selfing
+    Selfing_id = case_when(
+      father == mother ~ "Selfing",
+      father != mother ~ "Non-selfing",
+      TRUE ~ NA_character_
+    )
+  ) |> 
+  pivot_longer(cols = c(Homozygosity, Heterozygosity, Homozygosity2, Heterozygosity2),
+               names_to = "Metric", values_to = "Proportion")
+
+# Data to plot the updated graph
+summary_by_selfing_updated <- homo_hetero_data |>
+  mutate(
+    # Track selfing and non-selfing
+    Selfing_id = case_when(
+      father == mother ~ "Selfing",
+      father != mother ~ "Non-selfing",
+      father == mother & SelfingRate == 0 ~ "Non-selfing",
+      TRUE ~ NA_character_
+    )
+  ) |> 
+  group_by(SelfingRate, Selfing_id) |>
+  summarize(
+    # Calculate total
+    N = as.character(round(n() / (nrow(homo_hetero_data) / length(unique(homo_hetero_data$SelfingRate))), 2)),
+    # Calculate variance
+    Var.Homozygosity = as.character(round(var(Homozygosity), 2)),
+   # Calculate deviation
+    SD.Homozygosity = as.character(round(sd(Homozygosity), 2)),
+    # Calculate averages
+    Homozygosity = as.character(round(median(Homozygosity), 2)),
+    # Write the labels
+    L.Homozygosity = paste0(Homozygosity, " (", scales::percent(as.numeric(SD.Homozygosity), accuracy = 1), ")"),
+    .groups = 'drop'
+  ) |>
+ pivot_longer(
+    cols = -c("SelfingRate", "Selfing_id"),
+    names_to = "Metric",
+    values_to = "Proportion"
+  )
+
+# Data for distribution of SNP Types (0, 1, 2) by Selfing Rate
+snp_data_long <- homo_hetero_data |> 
+  pivot_longer(cols = c(n_0_loci, n_1_loci, n_2_loci),
+               names_to = "SNP_Type", values_to = "Count")
+
+homo_hetero_long |>
+  filter(SelfingRate == 0.5 & Metric %in% "Homozygosity") |> 
+  mutate(
+    check = case_when(
+      Proportion > 0.7 ~ "Higher homozigosity",
+      TRUE ~ "Lower homozigosity"
+    )
+  ) |> 
+  group_by(Selfing_id, check) |> 
+  summarise(n = n(),
+            mean = mean(Pheno),
+            Selfing = paste(round(range(Proportion), 2), collapse = "-"),
+            `1+Fi` = mean(`1+Fi`))
+  
+```
+
+
+```{r plot_distribution, fig.height=6, fig.width=8}
+# additing clear labels for the facets
+add_prefix <- function(string) {
+  paste("Selfing Rate = ", scales::percent(as.numeric(string)))
+}
+
+ggplot(homo_hetero_long |>
+         filter(Metric %in% c("Homozygosity", "Heterozygosity")),
+       aes(x = Proportion, fill = Metric)) +
+  geom_density(alpha = 0.6, 
+               #colour = Metric,
+               stat = "density"
+               ) +
+  geom_vline(
+    data = summary_by_selfing |>
+      filter(Metric %in% c("Homozygosity", "Heterozygosity")),
+    aes(xintercept = as.numeric(Proportion), color = Metric),
+    linetype = "dashed",
+    linewidth = 0.8
+  ) +
+  scale_x_continuous(
+    breaks = seq(from = 0, to = 1, by = 0.1),
+    labels = scales::percent_format(accuracy = 1),
+    guide = guide_axis(n.dodge = 2, angle = 0),
+  ) +
+  scale_fill_manual(
+    name = "",
+    breaks = c(
+      "Heterozygosity",
+      "Homozygosity"
+    ),
+    values = scales::hue_pal()(2)
+  ) +
+  scale_color_manual(
+    name = "",
+    breaks = c(
+      "Heterozygosity",
+      "Homozygosity"
+    ),
+    values = scales::hue_pal()(2)
+  ) +
+  facet_wrap(
+    ~ SelfingRate,
+    scales = "fixed",
+    axes = "all_x",
+    labeller = as_labeller(add_prefix)
+  ) +
+  labs(title = "Distribution of Homozygosity and Heterozygosity by Selfing Rate",
+       x = "Proportion",
+       y = "Density",
+       fill = "Metric") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(
+    size = 8,
+    hjust = 1,
+    vjust = 1
+    ),
+    legend.position = "bottom",
+    plot.title = element_text(
+      hjust = 0.5
+    )
+  ) +
+  geom_text(
+    data = summary_by_selfing |>
+      filter(Metric %in% c("Homozygosity", "Heterozygosity")) |> 
+      mutate(
+        Proportion = as.numeric(Proportion),
+        x.pos = case_when(
+          Metric == "Homozygosity" ~ 0.9,
+          Metric == "Heterozygosity" ~ 0.1,
+          TRUE ~ NA
+        )
+      ),
+    aes(label = scales::percent(as.numeric(Proportion), accuracy = 1), 
+        y = 20, color = Metric, 
+        x = x.pos),
+    alpha = 0.8,
+    size = 3.5,
+    show.legend = F
+  ) +
+  # Annotate SD
+  geom_text(
+    data = summary_by_selfing |>
+      filter(Metric %in% c("SD.Homozygosity")) |> 
+      mutate(
+        Metric = case_when(
+          Metric == "SD.Homozygosity" ~ "Homozygosity",
+          TRUE ~ Metric
+        ),
+        Proportion = as.numeric(Proportion)
+      ),
+    aes(label = paste0("SD = ", scales::percent(as.numeric(Proportion), accuracy = 1)),
+        y = 20, x = 0.5),
+    color = "black",
+    alpha = 0.8,
+    size = 3,
+    show.legend = F
+  )
+
+# Save graph
+ggsave("Results/Heter_HomoOP.plot_2025.png",
+       dpi = 300,
+       height = 6,
+       width = 8
+       )
+```
+
+```{r plot_distribution2, fig.height=6, fig.width=8}
+# additing clear labels for the facets
+add_prefix <- function(string) {
+  paste("Selfing Rate = ", scales::percent(as.numeric(string)))
+}
+
+ggplot(homo_hetero_long |>
+         filter(Metric %in% c("Homozygosity")),
+       aes(x = Proportion, colour = Selfing_id, fill = Selfing_id)) +
+  geom_density(alpha = 0.6,
+               stat = "count",
+               position = "identity") +
+  geom_vline(
+    data = summary_by_selfing_id |>
+      filter(Metric %in% c("Homozygosity")),
+    aes(xintercept = as.numeric(Proportion), color = Selfing_id),
+    linetype = "dashed",
+    linewidth = 0.8,
+    show.legend = T
+  ) +
+  scale_x_continuous(
+    breaks = seq(from = 0, to = 1, by = 0.1),
+    labels = scales::percent_format(accuracy = 1),
+    guide = guide_axis(n.dodge = 2, angle = 0),
+  ) +
+  scale_fill_manual(
+    name = "",
+    breaks = c(
+      "Selfing",
+      "Non-selfing"
+    ),
+    values = scales::hue_pal()(2)
+  ) +
+  scale_color_manual(
+    name = "",
+    breaks = c(
+      "Selfing",
+      "Non-selfing"
+    ),
+    values = scales::hue_pal()(2)
+  ) +
+  facet_wrap(
+    ~ SelfingRate,
+    scales = "fixed",
+    axes = "all_x",
+    labeller = as_labeller(add_prefix)
+  ) +
+  labs(title = "Distribution of Homozygosity by Selfing Rate",
+       x = "Proportion of homozigosity",
+       y = "Density",
+       color = "") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(
+    size = 8,
+    hjust = 1,
+    vjust = 1
+    ),
+    legend.position = "bottom",
+    plot.title = element_text(
+      hjust = 0.5
+    )
+  ) +
+  geom_text(
+    data = summary_by_selfing_updated |>
+      filter(Metric %in% c("N")) |> 
+      mutate(
+        Proportion = as.numeric(Proportion),
+        x.pos = case_when(
+          Selfing_id == "Non-selfing" ~ 0.7,
+          Selfing_id == "Selfing" ~ 0.9,
+          TRUE ~ NA
+        )
+      ),
+    aes(label = scales::percent(as.numeric(Proportion), accuracy = 1), 
+        y = 60, color = Selfing_id, 
+        x = x.pos),
+    alpha = 0.8,
+    size = 3.5,
+    show.legend = F
+  )
+
+ggsave("Results/Homozigosity.OP_2025.png",
+       dpi = 300,
+       height = 6,
+       width = 8
+       )
+```
+
+```{r calc_inbreeding}
+# OP
+
+# Insert simul and selfing rate
+for (i in names(OP.SIMUL)) {
+  OP.SIMUL[[i]][["Data"]] <- OP.SIMUL[[i]][["Data"]] |>
+    mutate(
+      Simul = trimws(gsub(".*Rep", "", i)),
+      SelfRate = unique(OP.SIMUL[[i]][["SelfRate"]])
+    )
+}
+
+# Extract data
+Data.OP <- OP.SIMUL |> 
+  map_dfr(~ .x$Data) |>
+  mutate(
+    SelfID = ifelse(father == mother, "Self", "Cross")
+  ) |> 
+  # Correct selfing rate
+   mutate(SelfRate = case_when(
+    SelfRate == "5.1%" ~ "5.0%",
+    SelfRate == "50.1%" ~ "50.0%",
+    SelfRate == "0.2%" ~ "0.0%",
+    SelfRate == "25.2%" ~ "25.0%",
+    SelfRate == "10.2%" ~ "10.0%",
+    SelfRate == "25.1%" ~ "25.0%",
+    SelfRate == "0.1%" ~ "0.0%",
+    SelfRate == "50.2%" ~ "50.0%",
+    SelfRate == "10.1%" ~ "10.0%",
+    SelfRate == "5.2%" ~ "5.0%",
+    SelfRate == "75.1%" ~ "75.0%",
+    SelfRate == "0.3%" ~ "0.0%",
+    TRUE ~ SelfRate
+  )) |>
+  # convert self rate (%0.0 format) to numeric
+  mutate(SelfRate = round(as.numeric(gsub("%", "", SelfRate)) / 100, 2))
+
+# Calculate the inbreeding depression
+Inbreeding.OP <- Data.OP |> 
+  group_by(Simul, SelfRate) |>
+  summarise(
+    F_ = round((mean(Pheno[SelfID == "Cross"]) - mean(Pheno[SelfID == "Self"])) / mean(Pheno[SelfID == "Cross"]), 2),
+    .groups = "drop"
+  )
+
+
+# Calculate the inbreeding depression 2
+Inbreeding.OP2 <- Data.OP |> 
+  group_by(Simul, SelfRate, SelfID) |>
+  summarise(
+    F_ = round((Pheno - mean(Pheno)) / mean(Pheno), 2),
+    .groups = "drop"
+  )
+
+```
+
+```{r plot_inbreeding.op, fig.height=5, fig.width=6}
+# Compute the mean phenotype for each SelfID group
+mean_phenos_op <- Data.OP |>
+  filter(!(SelfRate == 0 & SelfID == "Self")) |>
+  group_by(SelfID) |>
+  summarise(
+    mean_pheno = mean(Pheno),
+    SD = sd(Pheno),
+    Max = max(Pheno),
+    Min = min(Pheno)
+  )
+
+# Compute the percentage difference between the means
+if (nrow(mean_phenos_op) == 2) {
+  percentage_diff <- abs(diff(mean_phenos_op$mean_pheno)) / max(mean_phenos_op$mean_pheno) * 100
+} else {
+  percentage_diff <- NA  # Handle the case where there are not exactly two groups
+}
+
+# Define the y positions for the labels and arrows
+mean_phenos_op <- mean_phenos_op %>%
+  mutate(y_pos = 0.02)  # Adjust this value as needed for the label and arrow position
+
+
+plot_density_all <- ggplot(Data.OP |>
+                             filter(!(SelfRate == 0 &
+                                        SelfID == "Self")),
+                           aes(x = Pheno, fill = SelfID)) +
+  geom_density() +
+  # Insert vertical line by SelfID
+  geom_vline(data = mean_phenos_op,
+             aes(xintercept = mean_pheno, linetype = SelfID),
+             alpha = 0.5) +
+  # Add labels for the means
+  geom_text(
+    data = mean_phenos_op,
+    aes(
+      x = mean_pheno,
+      y = y_pos,
+      label = round(mean_pheno, 1)
+    ),
+    vjust = -1,
+    color = "black",
+    size = 3
+  ) +
+  # Add arrows pointing to the vertical lines
+  geom_segment(
+    data = mean_phenos_op,
+    aes(
+      x = mean_pheno,
+      xend = mean_pheno,
+      y = y_pos + 0.02,
+      yend = y_pos + 0.01
+    ),
+    arrow = arrow(length = unit(0.02, "npc")),
+    color = "black"
+  ) +
+  labs(
+    title = "Density Distribution of Phenotype",
+    x = "Phenotype",
+    y = "Density"
+  ) +
+  theme_minimal()
+
+# Add percentage difference annotation if there are exactly two groups
+if (!is.na(percentage_diff)) {
+  mean_positions <- mean_phenos_op$mean_pheno
+  annotation_x <- mean(mean_positions)
+  annotation_y <- max(ggplot_build(plot_density_all)$data[[1]]$density) * 0.9
+  
+  plot_density_op_all <- plot_density_all +
+    annotate(
+      "text",
+      x = annotation_x,
+      y = 0.06,
+      label = paste0("Difference: ", round(percentage_diff, 1), "%"),
+      color = "white",
+      size = 3,
+    )
+}
+plot_density_op_all
+
+# Save plots
+
+ggsave("Results/Inbreeding_Density_OP_all.png",
+       plot_density_op_all,
+       dpi = 300,
+       height = 5,
+       width = 6
+       )
+
+```
+
+```{r testing..., eval=FALSE, rows.print=50}
+GAP.GV.OP2 |>
+  mutate(
+    Model = case_when(
+      Model == "Pheno" ~ "Phenotype",
+      TRUE ~ Model
+    )
+  ) |> 
+  group_by(Model, SI, SelfRate) |>
+  summarise(
+    range_ = paste(max(Gap, na.rm = T), min(Gap, na.rm = T), sep = ", "),
+    Gap = mean(Gap, na.rm = T)) |> 
+  filter(SelfRate == 0.25)
+```
+
+
+```{r Final}
+
+```
+
+
+

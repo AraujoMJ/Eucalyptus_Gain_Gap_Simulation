@@ -1,0 +1,243 @@
+---
+title: "Quantifying genetic and genotypic gain gaps in *Eucalyptus*: The Hidden Cost of Ignoring Inbreeding and Dominance"
+author: "Marcio Araujo"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: hide
+    toc: yes
+    toc_depth: '2'
+    df_print: paged
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+    number_sections: yes
+    fig_caption: yes
+    toc-location: left
+---
+
+```{r fistChunck, include=F}
+knitr::opts_chunk$set(
+  echo = T,
+  warning = F,
+  message = F
+  # fig.height = 5.5,
+  # fig.width = 8.5
+  
+)
+```
+
+```{r Useful.setup, eval=F}
+# Check number of cores in my computer
+num_cores <- parallel::detectCores()
+cat("Number of cores in your machine:", num_cores, "\n")
+
+```
+
+# Loading the following packages
+
+```{r load.pct, warning=FALSE,message=F}
+# R 4.4.2
+# install.packages("AlphaSimR")
+library(AlphaSimR)
+#library(Matrix)
+library(tidyr)
+library(dplyr)
+library(stringr)
+library(tidyr)
+library(tibble)
+library(purrr)
+library(ggplot2)
+# library(ggrepel)
+library(AGHmatrix)
+library(ASRgenomics)
+library(asreml)
+```
+
+# Parameters used in simulations
+
+```{r parameters_to_simul}
+  ## INITIAL PARAMETERS
+nInd       = 1000     # Reference breeding program
+nChr       = 11      # Myburg et al., 2014
+# nQTLPerChr = 9      # Grattapaglia et al., 2012, total of around 100 QTLs
+Ne         = 100     # Reference breeding program
+
+# Set up parameters for simulate pedigree
+generations = 2
+ids = nInd
+animals = F
+  ## Desirable selfing rate
+nP = 0.5
+  ## Set up number of families at F1
+nFam_F1 = 100
+# Set up parameters for simulation
+  ## Parameters to set up the machine
+    ### Set up the core numbers
+num_cores = NULL
+    ### set up if use N cores
+use_cores = NULL
+  ## Parameters to get the pedigree
+    ### Number of families: Founders in the base population
+n_Fam = 1000
+  ## Number of replication/blocks
+n_Block = 20
+  ## Number of trees on the plot
+n_Tree = 1
+  ## Plot sd
+VarPlot = 0.001
+# Parameter for simulations ==> 11000 SNPs 4TREE array (/11Chr)
+  ## Number of the QTL affecting the trait
+nQTLPerChr = 600 
+  ## Number of SNPs in the population
+nSNPPerChr = 400
+  ## Set up the Ne
+Ne = 100
+  ## mean of additive effect
+mu = 10.5
+  ## Phenotypic variance
+Vp = 12
+  ## Heritability
+Heritability = 0.25
+  ## Additive variance: Vp * Heritability
+Va = 12 * 0.25
+  ## Type of Amatrix used
+AddMat = "VanRaden"
+  ## Mean of the dominance variance
+MeanDom = 0.2
+  ## Type of Dmatrix used
+DomMat = "Vitezica"
+  ## Variance of the dominance: Vp * Domeff
+Vd = 12 * 0.2
+  ## Set up number of progeny per crosses to be simulated
+nProg = 20
+# Choose between open-pollination or control-pollination
+  ## OP = Open-pollination
+  ## CP = Control-pollination
+TypePop = "OP"
+# Set up parameter for extract parameters simulated
+  ## Get the sample of genotyped individuals from Gmatrix in the ssGBLUP models
+Samp = "0.5"
+Text_track = ""
+  ## Option to pull qtl, snps and haplotypes
+pullQTL = TRUE
+pullSNPs = TRUE
+pullHaplotype = TRUE
+  ## Choose between get only the simulated data to analyse or to get the complete simulated data plus analysis
+Get_only_data = FALSE
+  ## Choose whether to use parallellization or not
+use_cores = FALSE
+```
+
+# Load the function `Tree_breeding_simulator.R`
+
+See description of this function in this repository
+
+```{r Tree_Breeding_SimulatoR}
+source("Tree_breeding_simulation.R")
+```
+
+# Simulate Open-Polinated population: 100 simulations for each scenarios
+
+```{r Run_OP.S1_S100, eval=FALSE}
+# Create a list with the parameters to be run
+  ## Set up the selfing levels
+SelfSimul <- c("0", 
+              "0.05",
+              "0.10", 
+              "0.25", 
+              "0.5", 
+              "0.75",
+              "0.95")
+  ## Set up the number of SNPs
+nSnps <- c(400)
+# Create a data frame with all combinations of parameters and replications
+replications <- 1:100
+param_combinations <- expand.grid(SelfSimul = SelfSimul, Replication = replications)
+
+# Initialize a list to store the results
+OP.S1_S100 <- list()
+# Iterate over rows of the parameter combinations data frame
+system.time(
+  OP.S1_S100 <- purrr::pmap(param_combinations, function(SelfSimul, Replication) {
+    nSNPPerChr <- as.numeric(nSnps)
+    nQTLPerChr <- 1000 - as.numeric(nSnps)
+    
+    result <- try({
+      TB_SimulR(
+        generations = generations,
+        ids = nInd,
+        animals = F,
+        nP = as.numeric(as.character(SelfSimul)),
+        nFam_F1 = nFam_F1,
+        num_cores = num_cores,
+        use_cores = FALSE,
+        n_Fam = n_Fam,
+        n_Block = n_Block,
+        n_Tree = n_Tree,
+        VarPlot = VarPlot,
+        nQTLPerChr = nQTLPerChr,
+        nSNPPerChr = nSNPPerChr,
+        Ne = Ne,
+        mu = mu,
+        Vp = Vp,
+        Heritability = Heritability,
+        Va = Va,
+        AddMat = AddMat,
+        MeanDom = MeanDom,
+        DomMat = DomMat,
+        Vd = Vd,
+        nProg = nProg,
+        TypePop = TypePop,
+        Samp = "0.5",
+        ssGBLUP = TRUE,
+        Text_track = paste0("Self.", SelfSimul, "_Rep", Replication),
+        pullQTL = FALSE,
+        pullSNPs = TRUE,
+        pullHaplotype = FALSE,
+        Get_only_data = FALSE
+      )
+    })
+    
+    return(result)
+  })
+)
+# ~ 40h
+
+# Combine the results into a named list
+OP.S1_S100_renamed <- setNames(OP.S1_S100, apply(param_combinations, 1, function(row) {
+  paste0("Self.", row[["SelfSimul"]], "_", "_Rep", row[["Replication"]])
+}))
+
+```
+
+# Save simulations and results
+
+```{r split_files}
+# OP.S1_S10 = Simulations from 1 to 10
+OP.S1_S10 <- qsave(OP.S1_S100_renamed[1:70],"OP.S1_S10.qs", preset = "high")
+# OP.S11_S20 = Simulations from 11 to 20
+OP.S11_S20 <- qsave(OP.S1_S100_renamed[71:140], "OP.S11_S20.qs", preset = "high")
+# OP.S21_S30 = Simulations from 21 to 30
+OP.S21_S30 <- qsave(OP.S1_S100_renamed[141:210], "OP.S21_S30.qs", preset = "high")
+# OP.S31_S40 = Simulations from 31 to 40
+OP.S31_S40 <- qsave(OP.S1_S100_renamed[211:280], "OP.S31_S40.qs", preset = "high")
+# OP.S41_S50 = Simulations from 41 to 50
+OP.S41_S50 <- qsave(OP.S1_S100_renamed[281:350], "OP.S41_S50.qs", preset = "high")
+# OP.S51_S60 = Simulations from 51 to 60
+OP.S51_S60 <- qsave(OP.S1_S100_renamed[351:420], "OP.S51_S60.qs", preset = "high")
+# OP.S61_S70 = Simulations from 61 to 70
+OP.S61_S70 <- qsave(OP.S1_S100_renamed[421:490], "OP.S61_S70.qs", preset = "high")
+# OP.S71_S80 = Simulations from 71 to 80
+OP.S71_S80 <- qsave(OP.S1_S100_renamed[491:560], "OP.S71_S80.qs", preset = "high")
+# OP.S81_S90 = Simulations from 81 to 90
+OP.S81_S90 <- qsave(OP.S1_S100_renamed[561:630], "OP.S81_S90.qs", preset = "high")
+# OP.S91_S100 = Simulations from 91 to 100
+OP.S91_S100 <- qsave(OP.S1_S100_renamed[631:700], "OP.S91_S100.qs", preset = "high")
+```
+
+
+```{r Final}
+
+```
+

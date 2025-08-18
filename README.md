@@ -1,11 +1,11 @@
 # Eucalyptus_Gain_Gap_Simulation
 R scripts and data for simulating genetic/genotypic gain gaps in Eucalyptus pellita under varying selfing rates. Includes pedigree, genomic, and single-step models with dominance, using the main function Tree_breeding_simulator.R to generate, analyze, and visualize results.
 
-# Quantifying Genetic and Genotypic Gain Gaps in Eucalyptus
+# Quantifying Genetic and Genotypic Gain Gaps in *Eucalyptus*
 
 This repository contains simulation scripts, data, and documentation for the study:
 
-**Araujo MJ, Bush D, Tambarussi EV. _Quantifying Genetic and Genotypic Gain Gaps in Eucalyptus: The Hidden Cost of Ignoring Inbreeding and Dominance_. Heredity.**
+**Araujo MJ, Bush D, Tambarussi EV. _Quantifying genetic and genotypic gain gaps in *Eucalyptus*: The Hidden Cost of Ignoring Inbreeding and Dominance_. Heredity.**
 
 ## Overview
 
@@ -39,25 +39,16 @@ The **main simulation pipeline** is implemented in:
 Eucalyptus_Gain_Gap_Simulation/
 │
 ├── R/
-│ ├── Tree_breeding_simulator.R # Main simulation function
-│ ├── Genetic_models.R # Model fitting functions
-│ ├── Analysis_functions.R # Custom analysis utilities
+│   ├── Tree_breeding_simulator.R   # Main custom simulation function 
+│   ├── Genetic_Gain.R              # Function to calculate genetic/genotypic gains
+│   ├── Selfing_Eucalyptus_2025.R   # Script applying Tree_breeding_simulator to run simulations
 │
 ├── data/
-│ ├── example_input/ # Example parameter files
-│ ├── output/ # Example output datasets (.qs)
-│
-├── figs/
-│ ├── Figure1_heritability.png
-│ ├── Figure2_dominance.png
-│ ├── ...
-│
-├── tables/
-│ ├── Table1_models.csv
-│ ├── Table2_deployment_strategies.csv
+│   ├── output/                     # Simulation results (.qs files)
 │
 ├── README.md
 └── LICENSE
+
 ```
 ---
 
@@ -80,11 +71,17 @@ Eucalyptus_Gain_Gap_Simulation/
    ```bash
    git clone https://github.com/USERNAME/Eucalyptus_Gain_Gap_Simulation.git
    cd Eucalyptus_Gain_Gap_Simulation
+   ```
+2. Open and edit simulation parameters in `Selfing_Eucalyptus_2025.R` (e.g., selfing rates, number of replicates, selection intensities).
 
-2. Open `Tree_breeding_simulator.R` and set simulation parameters (selfing rates, selection intensities, number of replicates, etc.).
+3. Run the main pipeline in R:
 
-Run in R:
+```
 source("R/Tree_breeding_simulator.R")
+source("R/Selfing_Eucalyptus_2025.R")
+
+```
+
 results <- Tree_breeding_simulator(params)
 
 4. Generated output tables and figures will be stored in `data/output/` and `figs/`.
@@ -92,4 +89,4 @@ results <- Tree_breeding_simulator(params)
 ## Citation
 If you use this repository, please cite:
 
-Araujo MJ, Bush D, Tambarussi EV. Quantifying Genetic and Genotypic Gain Gaps in Eucalyptus: The Hidden Cost of Ignoring Inbreeding and Dominance. Heredity. [DOI link]
+[Araujo MJ](https://orcid.org/0000-0001-7218-3879), Bush D, [Tambarussi EV](https://orcid.org/0000-0001-9478-5379). Quantifying genetic and genotypic gain gaps in *Eucalyptus*: The Hidden Cost of Ignoring Inbreeding and Dominance. Heredity. [https://doi.org/10.1038/s41437-025-00792-8](https://doi.org/10.1038/s41437-025-00792-8)
