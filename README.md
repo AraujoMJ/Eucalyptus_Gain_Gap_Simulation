@@ -86,7 +86,7 @@ Run the script:
 
 `Selfing_Eucalyptus_2025.Rmd`
 
-4. Run the script `Results_2025_Final.Rmd` and generated output.
+4. Run the script `Results_2025_Final.Rmd` and generate output.
 
 ## Citation
 If you use this repository, please cite:
