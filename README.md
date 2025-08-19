@@ -39,9 +39,10 @@ The **main simulation pipeline** is implemented in:
 Eucalyptus_Gain_Gap_Simulation/
 │
 ├── R/
-│   ├── Tree_breeding_simulator.R   # Main custom simulation function 
-│   ├── Genetic_Gain.R              # Function to calculate genetic/genotypic gains
-│   ├── Selfing_Eucalyptus_2025.R   # Script applying Tree_breeding_simulator to run simulations
+│   ├── Tree_breeding_simulator.R     # Main custom simulation function 
+│   ├── Genetic_Gain.R                # Function to calculate genetic/genotypic gains
+│   ├── Selfing_Eucalyptus_2025.Rmd   # Script applying Tree_breeding_simulator to run simulations
+│   ├── Results_2025_Final.Rmd        # Script to generate plots from the simulaton results
 │
 ├── data/
 │   ├── output/                     # Simulation results (.qs files)
@@ -69,7 +70,7 @@ Eucalyptus_Gain_Gap_Simulation/
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/USERNAME/Eucalyptus_Gain_Gap_Simulation.git
+   git clone https://github.com/AraujoMJ/Eucalyptus_Gain_Gap_Simulation.git
    cd Eucalyptus_Gain_Gap_Simulation
    ```
 2. Open and edit simulation parameters in `Selfing_Eucalyptus_2025.Rmd` (e.g., selfing rates, number of replicates, selection intensities).
